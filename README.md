@@ -2,7 +2,7 @@
 
 This is a fan control service that is deployed over SSH and runs via systemd.
 
-It polls CPU and HDD temps (via SMART) to compute a fan speed once every minute.
+It polls CPU and HDD temps (via SMART) to compute a fan speed once every minute. It persists between reboots, and hopefully also between updates, and can be quickly re-deployed if not.
 
 ## Algorithm Parameters
 
