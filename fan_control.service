@@ -1,0 +1,11 @@
+[Unit]
+Description=Fan Control Based on Temperatures
+After=multi-user.target
+
+[Service]
+ExecStart=/root/fan_control.sh --service
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
