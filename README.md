@@ -34,7 +34,7 @@ FAN_FRAC = max(MIN_FAN, CPU_FAN, HDD_FAN)
 FAN_SPEED = 100% * min(FAN_FRAC, 1)
 ```
 
-![Default fan speed chart](https://github.com/hoxxep/UNAS-Pro-fan-control/blob/master/CHART.png?raw=true)
+![Default fan speed chart](https://github.com/hoxxep/UNAS-Pro-fan-control/blob/main/CHART.png?raw=true)
 
 ## Requirements
 
