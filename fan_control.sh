@@ -11,7 +11,7 @@ CPU_TGT=50
 CPU_MAX=70
 HDD_TGT=32
 HDD_MAX=50
-MIN_FAN=72  # 28% of 255
+MIN_FAN=39  # 15% of 255 (increase baseline to reduce fan speed variation)
 
 # SERVICE=true: loop once every 60s to set fan speed and temp, no LOGGING
 # SERVICE=false: run once, logging temps and fan speed to console
