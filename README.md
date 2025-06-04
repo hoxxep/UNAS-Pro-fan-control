@@ -9,26 +9,20 @@ It polls CPU and HDD temps (via SMART) to compute a fan speed once every minute.
 - **Deploy remotely:** `./deploy.sh $HOST` to deploy to the UNAS over SSH.
 - **Query remotely:** `./query.sh $HOST` to query temperatures and fan speeds.
 
-<details>
-<summary><strong>Manual deployment</strong></summary>
+### Manual Deployment
 
-### Copy files to UNAS Pro
-
+To be run on the UNAS Pro directly.
 ```bash
-scp fan_control.sh unas-pro:/root/fan_control.sh
-scp fan_control.service unas-pro:/etc/systemd/system/fan_control.service
-```
+# Download latest fan_control.sh and fan_control.service from GitHub to their destinations
+wget -O /root/fan_control.sh https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/fan_control.sh
+wget -O /etc/systemd/system/fan_control.service https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/fan_control.service
 
-### Restart service on the UNAS Pro
-
-```bash
+# Set up and restart the fan_control service
 systemctl daemon-reload
 systemctl enable fan_control.service
 systemctl restart fan_control.service
 systemctl status fan_control.service
 ```
-
-</details>
 
 ## Algorithm Parameters
 
