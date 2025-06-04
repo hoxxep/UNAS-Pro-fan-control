@@ -9,6 +9,27 @@ It polls CPU and HDD temps (via SMART) to compute a fan speed once every minute.
 - **Deploy remotely:** `./deploy.sh $HOST` to deploy to the UNAS over SSH.
 - **Query remotely:** `./query.sh $HOST` to query temperatures and fan speeds.
 
+<details>
+<summary><strong>Manual deployment</strong></summary>
+
+### Copy files to UNAS Pro
+
+```bash
+scp fan_control.sh unas-pro:/root/fan_control.sh
+scp fan_control.service unas-pro:/etc/systemd/system/fan_control.service
+```
+
+### Restart service on the UNAS Pro
+
+```bash
+systemctl daemon-reload
+systemctl enable fan_control.service
+systemctl restart fan_control.service
+systemctl status fan_control.service
+```
+
+</details>
+
 ## Algorithm Parameters
 
 Adjust the `fan_control.sh` parameters to suit your needs. These fan curves, specifically `MAX` and `TGT` temps, are currently set to keep the drives under 40ºC in a warm cabinet (30ºC ambient).
