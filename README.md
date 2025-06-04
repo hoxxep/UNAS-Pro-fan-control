@@ -17,6 +17,9 @@ To be run on the UNAS Pro directly.
 wget -O /root/fan_control.sh https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/fan_control.sh
 wget -O /etc/systemd/system/fan_control.service https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/fan_control.service
 
+# Make fan_control executable
+chmod +x /root/fan_control.sh
+
 # Set up and restart the fan_control service
 systemctl daemon-reload
 systemctl enable fan_control.service
