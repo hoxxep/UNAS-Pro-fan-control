@@ -30,17 +30,19 @@ systemctl status fan_control.service
 ```
 
 <details>
-<summary>Query temps and fan speed (Manual)</summary>
+<summary><strong>Query temps and fan speed (Manual)</strong></summary>
 
 Simply run the `fan_control.sh` script to query current temperatures and computed fan speed.
 
 ```bash
 /root/fan_control.sh
 ```
+
 </details>
 
 <details>
-<summary>Temporarily Disable (Manual)</summary>
+<summary><strong>Temporarily Disable (Manual)</strong></summary>
+
 ```bash
 # stop service, will still start fan_control again on next reboot
 systemctl stop fan_control.service
@@ -50,20 +52,24 @@ systemctl disable fan_control.service
 ```
 
 And you can re-enable with:
+
 ```bash
 systemctl enable fan_control.service
 systemctl start fan_control.service
 ```
+
 </details>
 
 <details>
-<summary>Uninstall (Manual)</summary>
+<summary><strong>Uninstall (Manual)</strong></summary>
+
 ```bash
 systemctl disable fan_control.service
 rm /root/fan_control.sh
 rm /etc/systemd/system/fan_control.service
 systemctl daemon-reload
 ```
+
 </details>
 
 ## Algorithm Parameters
@@ -94,7 +100,7 @@ FAN_SPEED = 100% * min(FAN_FRAC, 1)
 ```
 
 <details>
-<summary>Tips for setting parameters</summary>
+<summary><strong>Tips for setting parameters</strong></summary>
 
 Typically we leave the MAX variables fixed, and experiment with the TGT to find an ideal fan speed/noise/temperature trade off.
 
@@ -107,12 +113,14 @@ Adjust algorithm parameters in `fan_control.sh` remotely and redeploy remotely w
 
 #### Manual edit and redeploy
 Adjust algorithm parameters in `/root/fan_control.sh`, and then restart the systemd unit with:
+
 ```bash
 systemctl daemon-reload
 systemctl restart fan_control.service
 ```
 
 Running `/root/fan_control.sh` will print the current temperatures and computed fan speeds.
+
 </details>
 
 ## Requirements
