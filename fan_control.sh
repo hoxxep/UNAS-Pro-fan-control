@@ -1,12 +1,20 @@
 #!/bin/bash
 
 # Fan control service for a UNAS Pro.
+#
+# Run directly as /root/fan_control.sh to query current temps and computed fan speeds.
+# Use the --service flag to loop once per minute and prevent logging to stdout.
+#
+# Repo: https://github.com/hoxxep/UNAS-Pro-fan-control
+# Author: Liam Gray
+# License: MIT
 
 set -euo pipefail
 
 # TGT = desired healthy temp in Celcius to run at 15% fans
 # MAX = unhealthy temp to run at 100% fans
-# Fan speed will be set linearly based on the actual temp between TGT and MAX.
+# Fan speed will be set linearly based on the current temp between TGT and MAX.
+# See README.md for tips on configuring these arguments.
 CPU_TGT=50
 CPU_MAX=70
 HDD_TGT=32
