@@ -13,7 +13,7 @@ It polls CPU and HDD temps (via SMART) to compute a fan speed once every minute.
 
 ### Manual Deployment
 
-To be run on the UNAS Pro directly.
+To be run on the UNAS Pro directly as root.
 ```bash
 # Download latest fan_control.sh and fan_control.service from GitHub to their destinations
 wget -O /root/fan_control.sh https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/fan_control.sh
@@ -26,6 +26,8 @@ chmod +x /root/fan_control.sh
 systemctl daemon-reload
 systemctl enable fan_control.service
 systemctl restart fan_control.service
+
+# Check fan_control.service is running
 systemctl status fan_control.service
 ```
 
@@ -109,7 +111,7 @@ Set the HDD and CPU max temperatures where you would like to run the fans at 100
 Look out for which temperature is setting the fan speed. The HDD and CPU temps compute two separate fan curves, and the higher computed fan speed is chosen. The systemd service will check temperatures and set fan speeds once every minute.
 
 #### Remote edit and redeploy
-Adjust algorithm parameters in `fan_control.sh` remotely and redeploy remotely with `./deploy.sh $HOST`. Temperatures and computed fan speeds can be queried with `./query.sh $HOST` or by running `/root/fan_control.sh` manually.
+Adjust algorithm parameters in `fan_control.sh` remotely and redeploy remotely with `./deploy.sh $HOST`. Temperatures and computed fan speeds can be queried with `./query.sh $HOST`.
 
 #### Manual edit and redeploy
 Adjust algorithm parameters in `/root/fan_control.sh`, and then restart the systemd unit with:
@@ -119,7 +121,7 @@ systemctl daemon-reload
 systemctl restart fan_control.service
 ```
 
-Running `/root/fan_control.sh` will print the current temperatures and computed fan speeds.
+Temperatures and fan speeds can be queried by running `/root/fan_control.sh` directly.
 
 </details>
 
