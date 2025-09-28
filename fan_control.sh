@@ -55,7 +55,7 @@ set_fan_speed() {
     done
 
     # List of HDD devices
-    hdd_devices=(sda sdb sdc sdd sde sdf sdg)
+    hdd_devices=(sda sdb sdc sdd sde sdf sdg sdh)
 
     # Initialize maximum HDD temperature
     HDD_TEMP=0

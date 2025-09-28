@@ -2,7 +2,9 @@
 
 This is a fan control service using a linear fan curve that is deployed over SSH and runs via systemd. It's specifically designed for the [Ubiquiti UNAS Pro](https://ui.com/us/en/integrations/network-storage) to keep the HDDs cooler than the default fan controller.
 
-It polls CPU and HDD temps (via SMART) to compute a fan speed once every minute. It persists between reboots and most updates, and can be quickly re-deployed if not.
+It polls CPU and HDD temps to compute a fan speed once every minute, aiming to run the fan at the quietest speed that also keeps the HDDs under 40ºC (configurable). It overrides the Ubiquiti quiet/balanced/fast fan presets and persists between reboots and updates.
+
+**Wanted:** UNAS Pro 8, UNAS Pro 4, UNAS 4, and UNAS 2 support. Testing and/or modifications to support these devices would be much appreciated!
 
 ## Deployment
 
