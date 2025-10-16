@@ -4,7 +4,7 @@ This is a fan control service using a linear fan curve that is deployed over SSH
 
 It polls CPU and HDD temps to compute a fan speed once every minute, aiming to run the fan at the quietest speed that also keeps the HDDs under 40ºC (configurable). It overrides the Ubiquiti quiet/balanced/fast fan presets and persists between reboots and updates.
 
-**Wanted:** UNAS Pro 8, UNAS Pro 4, UNAS 4, and UNAS 2 support. Testing and/or modifications to support these devices would be much appreciated!
+**Wanted:** ~~UNAS Pro 8~~, UNAS Pro 4, UNAS 4, and UNAS 2 support. Testing and/or modifications to support these devices would be much appreciated!
 
 ## Deployment
 
