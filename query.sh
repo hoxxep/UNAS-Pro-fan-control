@@ -2,6 +2,8 @@
 
 # Run remotely to query UNAS Pro temps and fan speed.
 #
+# Usage: ./query.sh HOSTNAME
+#
 # Repo: https://github.com/hoxxep/UNAS-Pro-fan-control
 # Author: Liam Gray
 # License: MIT

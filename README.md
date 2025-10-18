@@ -4,7 +4,51 @@ This is a fan control service using a linear fan curve that is deployed over SSH
 
 It polls CPU and HDD temps to compute a fan speed once every minute, aiming to run the fan at the quietest speed that also keeps the HDDs under 40ºC (configurable). It overrides the Ubiquiti quiet/balanced/fast fan presets and persists between reboots and updates.
 
-**Wanted:** UNAS Pro 8, UNAS Pro 4, UNAS 4, and UNAS 2 support. Testing and/or modifications to support these devices would be much appreciated!
+Supported devices:
+- UNAS Pro
+- UNAS Pro 8 (confirmed by @toscano)
+
+Unconfirmed devices:
+- UNAS Pro 4
+- UNAS 4
+- UNAS 2
+
+<details>
+<summary><strong>Help confirm device support!</strong></summary>
+
+Please follow this checklist when confirming device support:
+- Run the `/root/fan_control.sh` script manually on your UNAS (or `query.sh` remotely), which will output logs with sensor readings.
+- Confirm CPU and all HDD temperature sensors are reading correctly, and there is a temperature reading for each of your installed HDDs. Example output below.
+    ```
+    /sys/class/hwmon/hwmon0/temp1_input CPU Temperature: 44ºC
+    /sys/class/hwmon/hwmon0/temp2_input CPU Temperature: 35ºC
+    /sys/class/hwmon/hwmon0/temp3_input CPU Temperature: 55ºC
+    /sys/class/thermal/thermal_zone0/temp CPU Temperature: 55ºC
+    /dev/sda HDD Temperature: 34°C
+    /dev/sdb HDD Temperature: 34°C
+    /dev/sdc HDD Temperature: 35°C
+    /dev/sdd HDD Temperature: 34°C
+    /dev/sde HDD Temperature: 36°C
+    /dev/sdf HDD Temperature: 34°C
+    /dev/sdg HDD Temperature: 35°C
+    Max HDD Temperature: 36°C
+    CPU Temperature: 55°C
+    ```
+- Confirm the fan speed is being set correctly. Note that Unifi OS can also change the fan speed, so occasional mismatches between the set and read fan speeds are acceptable, and `fan_control.sh` can be run multiple times. Example output below.
+    ```
+    Min Fan Speed: 39
+    HDD Fan Speed: 56
+    CPU Fan Speed: 63
+    Final Fan Speed (Max): 63
+    Fan /sys/class/hwmon/hwmon0/pwm1 has been set to 63/255, and is reading as 63/255.
+    Fan /sys/class/hwmon/hwmon0/pwm2 has been set to 63/255, and is reading as 63/255.
+    Fan /sys/class/hwmon/hwmon0/pwm3 has been set to 63/255, and is reading as 63/255.
+    ```
+- When running the systemd service, confirm the HDD temperatures and fan speeds reach your expected range after 30+ minutes of operation.
+
+Please raise a GitHub issue to confirm if this script is working, or to log what the issue is and we can try to add support if you're willing to help us test. Patches for new temperature sensors or fan devices are also welcome. Thanks!
+
+</details>
 
 ## Deployment
 

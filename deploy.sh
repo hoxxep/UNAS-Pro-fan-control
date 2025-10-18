@@ -2,6 +2,8 @@
 
 # Run remotely to deploy the fan control service onto a UNAS Pro.
 #
+# Usage: ./deploy.sh HOSTNAME
+#
 # Repo: https://github.com/hoxxep/UNAS-Pro-fan-control
 # Author: Liam Gray
 # License: MIT

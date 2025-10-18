@@ -110,18 +110,34 @@ set_fan_speed() {
     log_echo "CPU Fan Speed: ${CPU_FAN}"
     log_echo "Final Fan Speed (Max): ${FAN_SPEED}"
 
-    # Set fan speed
-    echo $FAN_SPEED > /sys/class/hwmon/hwmon0/pwm1
-    echo $FAN_SPEED > /sys/class/hwmon/hwmon0/pwm2
+    # List of potential fan devices
+    fan_dir="/sys/class/hwmon/hwmon0"
+    fan_devices=(pwm1 pwm2 pwm3 pwm4)
+    FAN_FOUND=0
 
-    # Confirm fan speed
-    if $LOGGING; then
-        echo "Confirming fan speeds are set to ${FAN_SPEED}"
-        cat /sys/class/hwmon/hwmon0/pwm1
-        cat /sys/class/hwmon/hwmon0/pwm2
+    # Loop through each fan to set the speed
+    for fan in "${fan_devices[@]}"; do
+        fan_file="${fan_dir}/${fan}"
+        if [[ -e "$fan_file" ]]; then
+            FAN_FOUND=1
+            echo $FAN_SPEED > "$fan_file"
+
+            # Confirm fan speed
+            if $LOGGING; then
+                FAN_SPEED_SET_TO=$(cat "$fan_file")
+                echo "Fan $fan_file has been set to ${FAN_SPEED}/255, and is reading as ${FAN_SPEED_SET_TO}/255."
+            fi
+        fi
+    done
+
+    # If no fan devices found, log a clear error and exit
+    if (( FAN_FOUND == 0 )); then
+        echo "No fan devices found at: ${fan_dir}*"
+        exit 1
     fi
 }
 
+# run forever in service mode, run once in manual mode (to see output)
 if $SERVICE; then
     while true; do
         set_fan_speed
