@@ -6,7 +6,7 @@ It polls CPU and HDD temps to compute a fan speed once every minute, aiming to r
 
 Supported devices:
 - UNAS Pro
-- UNAS Pro 8 (confirmed by @toscano)
+- UNAS Pro 8 (confirmed by [@toscano](https://github.com/toscano))
 
 Unconfirmed devices:
 - UNAS Pro 4
