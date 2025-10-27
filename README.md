@@ -6,12 +6,12 @@ It polls CPU and HDD temps to compute a fan speed once every minute, aiming to r
 
 Supported devices:
 - UNAS Pro
-- UNAS Pro 8 (confirmed by [@toscano](https://github.com/toscano))
+- UNAS Pro 8 (confirmed by [@toscano](https://github.com/hoxxep/UNAS-Pro-fan-control/pull/4))
+- UNAS 2 (confirmed by [@Jordo-o](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/5))
 
 Unconfirmed devices:
 - UNAS Pro 4
 - UNAS 4
-- UNAS 2
 
 <details>
 <summary><strong>Help confirm device support!</strong></summary>
