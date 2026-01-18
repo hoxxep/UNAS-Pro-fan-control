@@ -1,6 +1,6 @@
-# Ubiquiti UNAS Pro Fan Control Service
+# Ubiquiti UNAS and UNVR Fan Control Service
 
-This is a fan control service using a linear fan curve that is deployed over SSH and runs via systemd. It's specifically designed for the [Ubiquiti UNAS Pro](https://ui.com/us/en/integrations/network-storage) to keep the HDDs cooler than the default fan controller.
+This is a fan control service using a linear fan curve that is deployed over SSH and runs via systemd. It's specifically designed for the [Ubiquiti UNAS products](https://ui.com/us/en/integrations/network-storage) to keep the HDDs cooler than the default fan controller.
 
 It polls CPU and HDD temps to compute a fan speed once every minute, aiming to run the fan at the quietest speed that also keeps the HDDs under 40ºC (configurable). It overrides the Ubiquiti quiet/balanced/fast fan presets and persists between reboots and updates.
 
@@ -8,10 +8,13 @@ Supported devices:
 - UNAS Pro
 - UNAS Pro 8 (confirmed by [@toscano](https://github.com/hoxxep/UNAS-Pro-fan-control/pull/4))
 - UNAS 2 (confirmed by [@Jordo-o](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/5))
+- UNVR (confirmed by [@gormic75](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/8))
 
 Unconfirmed devices:
 - UNAS Pro 4
 - UNAS 4
+- UNVR Pro
+- ENVR (likely has extra sensors)
 
 <details>
 <summary><strong>Help confirm device support!</strong></summary>
@@ -46,7 +49,7 @@ Please follow this checklist when confirming device support:
     ```
 - When running the systemd service, confirm the HDD temperatures and fan speeds reach your expected range after 30+ minutes of operation.
 
-Please raise a GitHub issue to confirm if this script is working, or to log what the issue is and we can try to add support if you're willing to help us test. Patches for new temperature sensors or fan devices are also welcome. Thanks!
+Please raise a GitHub issue to confirm if this script is working (or not!), or to log what the issue is and we can try to add support if you're willing to help us test. Patches for new temperature sensors or fan devices are also welcome. Thanks!
 
 </details>
 
