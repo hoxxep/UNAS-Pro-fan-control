@@ -9,11 +9,11 @@ Supported devices:
 - UNAS Pro 4 (confirmed by [@LuaPuglife](https://github.com/hoxxep/UNAS-Pro-fan-control/discussions/9))
 - UNAS Pro 8 (confirmed by [@toscano](https://github.com/hoxxep/UNAS-Pro-fan-control/pull/4))
 - UNAS 2 (confirmed by [@Jordo-o](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/5))
+- UNVR Pro (confirmed by [@timeguy147](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/10))
 - UNVR (confirmed by [@gormic75](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/8))
 
 Unconfirmed devices:
 - UNAS 4
-- UNVR Pro
 - ENVR (likely has extra sensors)
 
 <details>
