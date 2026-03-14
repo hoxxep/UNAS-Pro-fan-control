@@ -17,7 +17,7 @@ set -euo pipefail
 # See README.md for tips on configuring these arguments.
 CPU_TGT=50
 CPU_MAX=70
-HDD_TGT=32
+HDD_TGT=30
 HDD_MAX=50
 MIN_FAN=39  # 15% of 255 (increase baseline to reduce fan speed variation)
 
