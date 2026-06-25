@@ -226,24 +226,28 @@ set_fan_speed() {
         fi
     done < <(get_disk_temps)
 
-    # Function to calculate fan curve
+    # Function to calculate fan curve. The speed ramps linearly from MIN_FAN at
+    # the target temp (tgt) to 255 (100%) at the max temp, and is held at
+    # MIN_FAN below tgt. Scaling into [MIN_FAN, 255] means the fan starts
+    # responding right at tgt, rather than ignoring rising temps until a plain
+    # 0-based ramp happens to climb past the MIN_FAN floor.
     fan_curve() {
-        local min=$1
+        local tgt=$1
         local actual=$2
         local max=$3
 
-        fan_speed=$(awk -v min="$min" -v actual="$actual" -v max="$max" '
+        fan_speed=$(awk -v tgt="$tgt" -v actual="$actual" -v max="$max" -v floor="$MIN_FAN" '
         BEGIN {
-            if (actual <= min) {
+            if (actual <= tgt) {
                 ratio = 0
             } else if (actual >= max) {
                 ratio = 1
             } else {
-                ratio = (actual - min) / (max - min)
+                ratio = (actual - tgt) / (max - tgt)
             }
             if (ratio < 0) ratio = 0
             if (ratio > 1) ratio = 1
-            printf "%d", ratio * 255
+            printf "%d", floor + ratio * (255 - floor)
         }')
         echo $fan_speed
     }

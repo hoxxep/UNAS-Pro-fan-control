@@ -181,30 +181,33 @@ what state they were left in.
 Adjust the `fan_control.sh` parameters to suit your needs. These fan curves, specifically `MAX` and `TGT` temps, are currently set to keep the drives under 40ºC in a warm cabinet (30ºC ambient).
 
 - `SYS_TGT=50`: The target system temp (hottest of the CPU die and board sensors) in celcius, at which fans will run at `MIN_FAN`.
-- `SYS_MAX=70`: The max system temp in celcius, where fans will run at 100%.
+- `SYS_MAX=75`: The max system temp in celcius, where fans will run at 100%.
 - `HDD_TGT=32`: The target HDD temp in celcius, at which fans will run at `MIN_FAN`.
 - `HDD_MAX=50`: The max HDD temp in celcius, where fans will run at 100%.
 - `SSD_TGT=50`: The target SSD/NVMe temp in celcius, at which fans will run at `MIN_FAN`.
 - `SSD_MAX=70`: The max SSD/NVMe temp in celcius, where fans will run at 100%. Tuned for NVMe drives with little airflow, and safe for SATA SSDs too.
 - `MIN_FAN=39`: The minimum fan speed, 15% of 255 (fan speeds are out of 255).
 
-Fan speed is set linearly between the TGT temp (MIN_FAN fan speed) and MAX temp (100% fan speed). All sensors and fans are auto-detected: system temperatures come from the SoC thermal zones (the CPU die) and the board sensors on the fan-controller chip, while drives are discovered via SMART and classified as HDD or SSD (both SATA SSDs and NVMe), each with their own fan curve. The hottest sensor within each class sets that class's temp, and the highest computed fan speed across the system, HDD, and SSD curves is used. Every PWM channel on each detected fan-controller chip is then driven (drive and PSU/PMBus chips are skipped, so a PSU/BMC-managed fan is never touched). Pseudocode and fan speed chart below.
+Fan speed is set linearly between the TGT temp (`MIN_FAN` fan speed) and MAX temp (100% fan speed). All sensors and fans are auto-detected: system temperatures come from the SoC thermal zones (the CPU die) and the board sensors on the fan-controller chip, while drives are discovered via SMART and classified as HDD or SSD (both SATA SSDs and NVMe), each with their own fan curve. The hottest sensor within each class sets that class's temp, and the highest computed fan speed across the system, HDD, and SSD curves is used. Every PWM channel on each detected fan-controller chip is then driven (drive and PSU/PMBus chips are skipped, so a PSU/BMC-managed fan is never touched). Pseudocode and fan speed chart below.
 
-![Default fan speed chart](https://github.com/hoxxep/UNAS-Pro-fan-control/blob/main/CHART.png?raw=true)
+![Default fan speed chart](https://github.com/hoxxep/UNAS-Pro-fan-control/blob/main/charts/CHART.png?raw=true)
 
 ```python
 SYS_TEMP = max(CPU die temps + board sensor temps)
 HDD_TEMP = max(all HDD temps)
 SSD_TEMP = max(all SSD temps)
 
-# compute point linearly between target and max
-SYS_FAN = (SYS_TEMP - SYS_TGT) / (SYS_MAX - SYS_TGT)
-HDD_FAN = (HDD_TEMP - HDD_TGT) / (HDD_MAX - HDD_TGT)
-SSD_FAN = (SSD_TEMP - SSD_TGT) / (SSD_MAX - SSD_TGT)
+# How far each sensor sits between its target and max temp, as 0..1.
+# 0 at (or below) the TGT temp, 1 at (or above) the MAX temp.
+SYS_RATIO = clip((SYS_TEMP - SYS_TGT) / (SYS_MAX - SYS_TGT), 0, 1)
+HDD_RATIO = clip((HDD_TEMP - HDD_TGT) / (HDD_MAX - HDD_TGT), 0, 1)
+SSD_RATIO = clip((SSD_TEMP - SSD_TGT) / (SSD_MAX - SSD_TGT), 0, 1)
 
-# clip to range [MIN_FAN, 100%]
-FAN_FRAC = max(MIN_FAN, SYS_FAN, HDD_FAN, SSD_FAN)
-FAN_SPEED = 100% * min(FAN_FRAC, 1)
+# The hottest sensor (relative to its own curve) wins.
+RATIO = max(SYS_RATIO, HDD_RATIO, SSD_RATIO)
+
+# Map 0..1 onto the fan range: MIN_FAN at the target, 100% at the max.
+FAN_SPEED = MIN_FAN + RATIO * (100% - MIN_FAN)
 ```
 
 <details>
