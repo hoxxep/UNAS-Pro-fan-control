@@ -14,8 +14,8 @@ Supported devices:
 - UNVR (confirmed by [@gormic75](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/8))
 
 Unconfirmed devices:
-- UNAS 4
-- ENVR (likely has extra sensors)
+- ENVR
+- ENAS
 
 <details>
 <summary><strong>Help confirm device support!</strong></summary>
