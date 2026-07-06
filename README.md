@@ -12,13 +12,13 @@ Supported devices:
 - UNAS 4 (confirmed by [@sketcheroo86](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/13))
 - UNVR Pro (confirmed by [@timeguy147](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/10))
 - UNVR (confirmed by [@gormic75](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/8))
-
-Unconfirmed devices:
-- ENVR
-- ENAS
+- ENAS (confirmed by [@arcaderat22](https://www.reddit.com/user/arcaderat22/) via DMs)
+- ENVR (confirmed by [@arcaderat22](https://www.reddit.com/user/arcaderat22/) via DMs)
 
 <details>
 <summary><strong>Help confirm device support!</strong></summary>
+
+As of June 2026, all current UNAS and UNVR models are supported. This section is specifically for future devices, thank you!
 
 Please follow this checklist when confirming device support:
 - Run the `/root/fan_control.sh` script manually on your UNAS (or `query.sh` remotely), which will output logs with sensor readings. To dump the full sensor and fan topology (chip names, temp labels, fan RPM and PWM channels) — especially useful when confirming a new device — run `sensors.sh`. It's read-only and needn't be installed: `ssh $HOST 'bash -s' < sensors.sh`.
