@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased: Optional MQTT / Home Assistant bridge.
+
+### Added
+- `mqtt_bridge.py` + `mqtt_bridge.service`: an optional, opt-in bridge that
+  publishes temperatures, fan duty, and fan RPM to an MQTT broker with Home
+  Assistant device-based discovery (HA ≥ 2024.9), including per-drive
+  temperature sensors keyed by serial number, availability (LWT), and
+  re-discovery on Home Assistant restart. Single-file, stdlib-only python3
+  MQTT 3.1.1 client — no apt packages, so it survives UniFi OS firmware
+  updates. Inactive unless `/root/mqtt_bridge.conf` exists.
+- Fan-curve tuning from Home Assistant: `SYS_TGT`, `HDD_TGT`, `SSD_TGT`, and
+  `MIN_FAN` exposed as number entities. Values are clamped to ranges that stay
+  below the fixed `*_MAX` ceilings and persisted to `/root/fan_control.conf`.
+- `fan_control_state.sh`: optional helper sourced by `fan_control.sh`
+  providing the conf-override and state-snapshot hooks. Snapshots (an atomic
+  JSON file at `/run/fan_control/state.json`, root-only, including drive
+  serial numbers) are only written once `/root/mqtt_bridge.conf` exists, so
+  non-MQTT installs do no extra work. Overrides are parsed against a strict
+  key/integer allowlist — the conf file is never `source`d, so a corrupt file
+  can neither crash fan control nor execute code.
+
+### Changed
+- `fan_control.sh`: defines no-op hook stubs and calls them each iteration;
+  installing `fan_control_state.sh` replaces the stubs. Drive serial numbers
+  are passed to the state snapshot (console output is unchanged). A missing
+  or broken helper file leaves the stubs in place — fan control never depends
+  on the MQTT feature.
+- `deploy.sh`: also deploys the bridge files and unit (inert without a conf).
+
 ## 2026-06-25: Overhaul to support all UNAS devices correctly.
 
 ### Added

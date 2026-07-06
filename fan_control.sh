@@ -35,6 +35,19 @@ SSD_TGT=50
 SSD_MAX=70
 MIN_FAN=39  # 15% of 255 (increase baseline to reduce fan speed variation)
 
+# Optional MQTT-bridge hooks (fan_control_state.sh): apply_fan_conf applies
+# validated fan-curve overrides tuned from Home Assistant, and the state_*
+# hooks snapshot readings for the bridge. The no-op stubs below are the
+# defaults; a missing or broken helper leaves them in place, so fan control
+# never depends on the helper or the MQTT bridge.
+apply_fan_conf() { :; }
+state_begin() { :; }
+state_add_drive() { :; }
+state_end() { :; }
+if [[ -f /root/fan_control_state.sh ]]; then
+    source /root/fan_control_state.sh 2>/dev/null || true
+fi
+
 usage() {
     cat <<'EOF'
 Usage: fan_control.sh [--service | --restore | -h | --help]
@@ -154,7 +167,7 @@ get_disk_temps() {
 
             ([current_from_top, current_from_nvme_fallback, current_from_ata_attr_fallback] | first(.[]?)) as $temp
             | select($temp != null)
-            | [(device_class), $dev, ($temp | tostring)] | @tsv
+            | [(device_class), $dev, ($temp | tostring), (.serial_number // "")] | @tsv
         ' <<< "$json" 2>/dev/null || true
     done < <(jq -r '.devices[]? | [.name, (.type // "")] | @tsv' <<< "$scan" 2>/dev/null)
 }
@@ -201,6 +214,11 @@ get_system_temps() {
 }
 
 set_fan_speed() {
+    # Apply Home Assistant/MQTT parameter overrides, and reset the state
+    # snapshot for this iteration (no-ops unless the MQTT bridge is set up).
+    apply_fan_conf
+    state_begin
+
     # Auto-discover all system temperature sensors (CPU die + board/airflow) and
     # track the hottest. See get_system_temps().
     SYS_TEMP=0
@@ -216,9 +234,10 @@ set_fan_speed() {
 
     # Auto-discover all SMART devices and read each one's temperature, tracking
     # the hottest HDD and the hottest SSD separately. See get_disk_temps().
-    while IFS=$'\t' read -r class dev temp; do
+    while IFS=$'\t' read -r class dev temp serial; do
         [[ "$temp" =~ ^-?[0-9]+$ ]] || continue
         log_echo "${dev} ${class} Temperature: ${temp}°C"
+        state_add_drive "$class" "$dev" "$temp" "$serial"
         if [[ "$class" == "SSD" ]]; then
             if [ "$temp" -gt "$SSD_TEMP" ]; then SSD_TEMP=$temp; fi
         else
@@ -238,7 +257,18 @@ set_fan_speed() {
 
         fan_speed=$(awk -v tgt="$tgt" -v actual="$actual" -v max="$max" -v floor="$MIN_FAN" '
         BEGIN {
-            if (actual <= tgt) {
+            # Clamp the floor into the valid PWM range first. An absurdly
+            # large floor (bad MIN_FAN edit) otherwise cancels catastrophically
+            # in floor + ratio * (255 - floor) and prints 0 -- commanding the
+            # fans OFF precisely when overheating.
+            if (floor < 0) floor = 0
+            if (floor > 255) floor = 255
+            if (max <= tgt) {
+                # Degenerate/inverted parameters (TGT >= MAX): fail hot.
+                # Without this, actual <= tgt would swallow the whole range
+                # and silently pin the fans at the minimum while overheating.
+                ratio = (actual > tgt) ? 1 : 0
+            } else if (actual <= tgt) {
                 ratio = 0
             } else if (actual >= max) {
                 ratio = 1
@@ -249,7 +279,7 @@ set_fan_speed() {
             if (ratio > 1) ratio = 1
             printf "%d", floor + ratio * (255 - floor)
         }')
-        echo $fan_speed
+        echo "$fan_speed"
     }
 
     # Calculate fan speeds
@@ -333,6 +363,9 @@ set_fan_speed() {
         echo "No fan controller found (hwmon chip with pwm* outputs and fan*_input tachometers)."
         exit 1
     fi
+
+    # Write the state snapshot for the MQTT bridge (no-op unless installed).
+    state_end
 }
 
 # Hand the fans back to automatic (firmware/chip) control on every fan-controller
