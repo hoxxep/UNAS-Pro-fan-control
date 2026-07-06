@@ -177,6 +177,14 @@ what state they were left in.
 
 </details>
 
+## MQTT / Home Assistant (Optional)
+
+An optional `mqtt_bridge` service publishes temperatures and fan speeds to an
+MQTT broker (e.g. mosquitto) with Home Assistant discovery, and lets you tune
+the fan curve's target temperatures from Home Assistant. It is fully opt-in
+(inactive without `/root/mqtt_bridge.conf`), and fan control never depends on
+it. See [MQTT.md](MQTT.md) for setup, entities, and uninstall.
+
 ## Algorithm Parameters
 
 Adjust the `fan_control.sh` parameters to suit your needs. These fan curves, specifically `MAX` and `TGT` temps, are currently set to keep the drives under 40ºC in a warm cabinet (30ºC ambient).
