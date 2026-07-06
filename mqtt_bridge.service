@@ -1,0 +1,55 @@
+# MQTT bridge for the UNAS fan control service.
+#
+# Publishes temperatures/fan speeds to MQTT with Home Assistant discovery, and
+# accepts fan-curve tuning from Home Assistant. Entirely optional: without
+# /root/mqtt_bridge.conf this unit stays inactive (ConditionPathExists), so
+# installing it has no effect for non-MQTT users. Fan control itself never
+# depends on this unit.
+#
+# Repo: https://github.com/hoxxep/UNAS-Pro-fan-control
+# License: MIT
+
+[Unit]
+Description=MQTT bridge for fan_control (Home Assistant discovery)
+ConditionPathExists=/root/mqtt_bridge.conf
+After=network-online.target fan_control.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /root/mqtt_bridge.py
+Restart=always
+RestartSec=10
+User=root
+# Keep the bridge strictly lightweight: hard memory cap (a leak gets the
+# process killed and cleanly restarted, never the NAS starved), a CPU quota,
+# and low scheduling priority so fan control and storage always win.
+MemoryMax=48M
+CPUQuota=25%
+Nice=10
+# Sandbox: this is the only network-facing process in the repo, parsing a
+# binary protocol from the broker, so confine it. It only needs to read
+# /root/mqtt_bridge.py + /root/mqtt_bridge.conf + /run/fan_control/state.json,
+# write /root/fan_control.conf, and open one outbound TCP connection.
+# NOTE: the code lives in /root, so ProtectHome=yes (masks /root) and
+# ProtectSystem=strict (needs ReadWritePaths=/root to punch back in) both
+# break here -- UniFi OS's systemd v247 does not honour ReadWritePaths=/root
+# over those masks, so the process gets EACCES reading its own script.
+# ProtectSystem=full leaves /root writable without any override, so use it.
+# If the bridge fails to start/connect after a UniFi OS update, bisect by
+# commenting these out (fan control itself is unaffected either way).
+NoNewPrivileges=yes
+UMask=0077
+ProtectSystem=full
+PrivateTmp=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+CapabilityBoundingSet=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target
