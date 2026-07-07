@@ -26,14 +26,18 @@ set -euo pipefail
 # sensors on the fan-controller chip (e.g. adt7475). The hottest of these drives
 # it. See get_system_temps() for how these sensors are discovered.
 SYS_TGT=50
-SYS_MAX=75
+# SYS_MAX 85: the SoC throttles ~85°C+, and the hottest board diode (adt7475
+# temp3) runs ~12°C above the CPU die at idle. A wider TGT..MAX span also
+# flattens the curve slope so small temp wobbles don't slam the fans around.
+SYS_MAX=85
 HDD_TGT=32
-HDD_MAX=50
+HDD_MAX=55
 # SSDs (SATA and NVMe) tolerate higher temperatures than spinning disks.
 # Tuned for NVMe drives, which often have little airflow; safe for SATA SSDs too.
 SSD_TGT=50
 SSD_MAX=70
 MIN_FAN=39  # 15% of 255 (increase baseline to reduce fan speed variation)
+MAX_FAN=255 # Fan speed ceiling (reduce to cap noise; caps the curve even when overheating)
 
 # Optional MQTT-bridge hooks (fan_control_state.sh): apply_fan_conf applies
 # validated fan-curve overrides tuned from Home Assistant, and the state_*
@@ -246,23 +250,27 @@ set_fan_speed() {
     done < <(get_disk_temps)
 
     # Function to calculate fan curve. The speed ramps linearly from MIN_FAN at
-    # the target temp (tgt) to 255 (100%) at the max temp, and is held at
-    # MIN_FAN below tgt. Scaling into [MIN_FAN, 255] means the fan starts
-    # responding right at tgt, rather than ignoring rising temps until a plain
-    # 0-based ramp happens to climb past the MIN_FAN floor.
+    # the target temp (tgt) to MAX_FAN (default 255 = 100%) at the max temp,
+    # and is held at MIN_FAN below tgt. Scaling into [MIN_FAN, MAX_FAN] means
+    # the fan starts responding right at tgt, rather than ignoring rising temps
+    # until a plain 0-based ramp happens to climb past the MIN_FAN floor.
     fan_curve() {
         local tgt=$1
         local actual=$2
         local max=$3
 
-        fan_speed=$(awk -v tgt="$tgt" -v actual="$actual" -v max="$max" -v floor="$MIN_FAN" '
+        fan_speed=$(awk -v tgt="$tgt" -v actual="$actual" -v max="$max" -v floor="$MIN_FAN" -v ceil="$MAX_FAN" '
         BEGIN {
             # Clamp the floor into the valid PWM range first. An absurdly
             # large floor (bad MIN_FAN edit) otherwise cancels catastrophically
-            # in floor + ratio * (255 - floor) and prints 0 -- commanding the
+            # in floor + ratio * (ceil - floor) and prints 0 -- commanding the
             # fans OFF precisely when overheating.
             if (floor < 0) floor = 0
             if (floor > 255) floor = 255
+            # Invalid ceiling (below the floor or above 255, e.g. bad MAX_FAN
+            # edit): fail hot with the full range rather than pinning the fans
+            # below the floor.
+            if (ceil < floor || ceil > 255) ceil = 255
             if (max <= tgt) {
                 # Degenerate/inverted parameters (TGT >= MAX): fail hot.
                 # Without this, actual <= tgt would swallow the whole range
@@ -277,7 +285,7 @@ set_fan_speed() {
             }
             if (ratio < 0) ratio = 0
             if (ratio > 1) ratio = 1
-            printf "%d", floor + ratio * (255 - floor)
+            printf "%d", floor + ratio * (ceil - floor)
         }')
         echo "$fan_speed"
     }
@@ -298,6 +306,7 @@ set_fan_speed() {
     log_echo "Max System Temperature: ${SYS_TEMP}°C"
 
     log_echo "Min Fan Speed: ${MIN_FAN}"
+    log_echo "Max Fan Speed: ${MAX_FAN}"
     log_echo "HDD Fan Speed: ${HDD_FAN}"
     log_echo "SSD Fan Speed: ${SSD_FAN}"
     log_echo "System Fan Speed: ${SYS_FAN}"

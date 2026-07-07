@@ -14,9 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   re-discovery on Home Assistant restart. Single-file, stdlib-only python3
   MQTT 3.1.1 client — no apt packages, so it survives UniFi OS firmware
   updates. Inactive unless `/root/mqtt_bridge.conf` exists.
-- Fan-curve tuning from Home Assistant: `SYS_TGT`, `HDD_TGT`, `SSD_TGT`, and
-  `MIN_FAN` exposed as number entities. Values are clamped to ranges that stay
-  below the fixed `*_MAX` ceilings and persisted to `/root/fan_control.conf`.
+- Fan-curve tuning from Home Assistant: `SYS_TGT`, `HDD_TGT`, `SSD_TGT`,
+  `MIN_FAN`, and `MAX_FAN` exposed as number entities. Values are clamped to
+  ranges that stay below the fixed `*_MAX` ceilings and persisted to
+  `/root/fan_control.conf`.
+- `MAX_FAN` parameter in `fan_control.sh`: a fan speed ceiling (default 255)
+  the curves ramp to at their MAX temps, for capping fan noise. It caps the
+  fans even when overheating; an invalid value (below `MIN_FAN` or above 255)
+  fails hot with the full range.
 - `fan_control_state.sh`: optional helper sourced by `fan_control.sh`
   providing the conf-override and state-snapshot hooks. Snapshots (an atomic
   JSON file at `/run/fan_control/state.json`, root-only, including drive
@@ -26,6 +31,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   can neither crash fan control nor execute code.
 
 ### Changed
+- Default `SYS_MAX` 75 → 85 and `HDD_MAX` 50 → 55. Wider TGT..MAX spans
+  flatten the fan-curve slope (fewer PWM steps per °C), so temperature
+  wobbles no longer swing the fans audibly; both ceilings remain within
+  SoC throttle and HDD rating limits.
 - `fan_control.sh`: defines no-op hook stubs and calls them each iteration;
   installing `fan_control_state.sh` replaces the stubs. Drive serial numbers
   are passed to the state snapshot (console output is unchanged). A missing

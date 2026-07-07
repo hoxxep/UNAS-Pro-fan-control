@@ -43,7 +43,7 @@ apply_fan_conf() {
         case "$k" in
             SYS_TGT|SYS_MAX|HDD_TGT|HDD_MAX|SSD_TGT|SSD_MAX)
                 [[ "$v" =~ ^[0-9]{1,3}$ && $v -le 150 ]] && printf -v "$k" '%s' "$v" ;;
-            MIN_FAN)
+            MIN_FAN|MAX_FAN)
                 [[ "$v" =~ ^[0-9]{1,3}$ && $v -le 255 ]] && printf -v "$k" '%s' "$v" ;;
         esac
     done < "$FAN_CONF" 2>/dev/null || true
@@ -64,7 +64,7 @@ state_add_drive() {
 }
 
 # Write the snapshot. Reads fan_control.sh globals: SYS_TEMP HDD_TEMP SSD_TEMP
-# FAN_SPEED SYS_TGT SYS_MAX HDD_TGT HDD_MAX SSD_TGT SSD_MAX MIN_FAN.
+# FAN_SPEED SYS_TGT SYS_MAX HDD_TGT HDD_MAX SSD_TGT SSD_MAX MIN_FAN MAX_FAN.
 state_end() {
     (( ${STATE_ENABLED:-0} )) || return 0
     (
@@ -116,7 +116,8 @@ state_end() {
             --argjson sys_tgt "${SYS_TGT:-0}" --argjson sys_max "${SYS_MAX:-0}" \
             --argjson hdd_tgt "${HDD_TGT:-0}" --argjson hdd_max "${HDD_MAX:-0}" \
             --argjson ssd_tgt "${SSD_TGT:-0}" --argjson ssd_max "${SSD_MAX:-0}" \
-            --argjson min_fan "${MIN_FAN:-0}" '
+            --argjson min_fan "${MIN_FAN:-0}" \
+            --argjson max_fan "${MAX_FAN:-255}" '
             (split("\n") | map(select(length > 0) | split("\t"))) as $rows
             | ($rows | map(select(.[0] == "D"))) as $drows
             | {
@@ -140,7 +141,7 @@ state_end() {
                     sys_tgt: $sys_tgt, sys_max: $sys_max,
                     hdd_tgt: $hdd_tgt, hdd_max: $hdd_max,
                     ssd_tgt: $ssd_tgt, ssd_max: $ssd_max,
-                    min_fan: $min_fan
+                    min_fan: $min_fan, max_fan: $max_fan
                 }
             }' > "$STATE_FILE.tmp" 2>"$STATE_DIR/jq_error" \
             && rm -f "$STATE_DIR/jq_error" \

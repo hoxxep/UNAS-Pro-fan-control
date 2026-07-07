@@ -19,9 +19,11 @@ under **Settings → Devices & Services → MQTT** as "UNAS Fan Control".
   classes actually present — no phantom 0°C sensors), one temperature per
   drive (keyed by drive serial number, stable across `/dev` renames), fan
   duty %, and fan RPM per tachometer.
-- **Numbers (configuration):** `System target temp` (35–65°C), `HDD target
-  temp` (25–45°C), `SSD target temp` (35–62°C), `Minimum fan speed` (10–100%).
-  These map to `SYS_TGT`/`HDD_TGT`/`SSD_TGT`/`MIN_FAN` and persist in
+- **Numbers (configuration):** `System target temp` (35–70°C), `HDD target
+  temp` (25–45°C), `SSD target temp` (35–62°C), `Minimum fan speed` (5–100%),
+  `Maximum fan speed` (30–100%; caps the curve even when overheating, and is
+  ignored — full range used — if set below the minimum fan speed).
+  These map to `SYS_TGT`/`HDD_TGT`/`SSD_TGT`/`MIN_FAN`/`MAX_FAN` and persist in
   `/root/fan_control.conf`, which `fan_control.sh` re-reads (strict allowlist,
   integers only — never `source`d) every minute. Slider ranges are capped
   below the fixed `*_MAX` ceilings so the curve cannot be inverted from Home

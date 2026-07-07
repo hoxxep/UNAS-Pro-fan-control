@@ -38,7 +38,7 @@ import struct
 import sys
 import time
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 BRIDGE_CONF = os.environ.get("MQTT_BRIDGE_CONF", "/root/mqtt_bridge.conf")
 FAN_CONF = os.environ.get("FAN_CONF", "/root/fan_control.conf")
@@ -52,17 +52,20 @@ CONF_WRITE_INTERVAL = 2.0  # min seconds between conf writes (flood/flash-wear g
 # allowlist ranges fan_control_state.sh enforces on read. Values a hand-edit
 # or bug put outside these are dropped rather than perpetuated.
 CONF_KEY_MAX = {"SYS_TGT": 150, "SYS_MAX": 150, "HDD_TGT": 150, "HDD_MAX": 150,
-                "SSD_TGT": 150, "SSD_MAX": 150, "MIN_FAN": 255}
+                "SSD_TGT": 150, "SSD_MAX": 150, "MIN_FAN": 255, "MAX_FAN": 255}
 
 # Curve parameters exposed as Home Assistant number entities. Ranges are hard
 # caps chosen to sit below the fixed *_MAX ceilings in fan_control.sh, so a
-# slider can never invert the curve (TGT >= MAX). MIN_FAN is exposed as a
+# slider can never invert the curve (TGT >= MAX). *_pct keys are exposed as a
 # percentage but stored raw (0-255) in the conf, matching fan_control.sh.
+# min/max fan sliders CAN cross (min 100%, max 30%); fan_control.sh treats an
+# inverted MAX_FAN < MIN_FAN as invalid and fails hot with the full range.
 PARAMS = {
-    "sys_tgt": {"conf_key": "SYS_TGT", "name": "System target temp", "min": 35, "max": 65, "unit": "°C"},
+    "sys_tgt": {"conf_key": "SYS_TGT", "name": "System target temp", "min": 35, "max": 70, "unit": "°C"},
     "hdd_tgt": {"conf_key": "HDD_TGT", "name": "HDD target temp", "min": 25, "max": 45, "unit": "°C"},
     "ssd_tgt": {"conf_key": "SSD_TGT", "name": "SSD target temp", "min": 35, "max": 62, "unit": "°C"},
-    "min_fan_pct": {"conf_key": "MIN_FAN", "name": "Minimum fan speed", "min": 10, "max": 100, "unit": "%"},
+    "min_fan_pct": {"conf_key": "MIN_FAN", "name": "Minimum fan speed", "min": 5, "max": 100, "unit": "%"},
+    "max_fan_pct": {"conf_key": "MAX_FAN", "name": "Maximum fan speed", "min": 30, "max": 100, "unit": "%"},
 }
 
 
@@ -414,8 +417,8 @@ def discovery_payload(conf, state):
                            "{{ value_json.tachs['%s'] }}" % tach, "rpm")
 
     for pkey, spec in PARAMS.items():
-        template = ("{{ (value_json.params.min_fan * 100 / 255) | round(0) }}"
-                    if pkey == "min_fan_pct"
+        template = ("{{ (value_json.params.%s * 100 / 255) | round(0) }}" % pkey[:-len("_pct")]
+                    if pkey.endswith("_pct")
                     else "{{ value_json.params.%s }}" % pkey)
         cmps[pkey] = {
             "p": "number",
@@ -582,8 +585,9 @@ class Bridge:
             log("Ignoring non-finite %s command: %r" % (pkey, payload))
             return
         value = clamp(round(value), spec["min"], spec["max"])
-        conf_value = pct_to_raw(value) if pkey == "min_fan_pct" else value
-        state_key = "min_fan" if pkey == "min_fan_pct" else pkey
+        is_pct = pkey.endswith("_pct")
+        conf_value = pct_to_raw(value) if is_pct else value
+        state_key = pkey[:-len("_pct")] if is_pct else pkey
         # The conf file is the source of truth for persisted overrides: merge
         # into whatever is already there (including hand-added keys), never
         # rebuild from possibly-empty in-memory state.
@@ -676,21 +680,25 @@ def selftest():
     # ({{ (raw * 100 / 255) | round(0) }}) a stable round-trip.
     assert clamp(200, 25, 45) == 45 and clamp(-5, 25, 45) == 25
     assert pct_to_raw(100) == 255 and pct_to_raw(10) == 26
-    for pct in range(10, 101):
+    for pct in range(5, 101):
         # resubmitting the displayed percentage must not change the raw value
         assert round(pct_to_raw(pct) * 100 / 255) == pct, pct
     assert pct_to_raw(round(39 * 100 / 255)) == 39  # the default MIN_FAN
     assert sanitize_id("WD-WX/1 2") == "WD-WX_1_2"
     # discovery payload sanity
-    conf = {"device_id": "unas", "discovery_prefix": "homeassistant"}
+    conf = {"device_id": "unas", "discovery_prefix": "homeassistant",
+            "device_url": "https://unas.local"}
     state = {"sys_temp": 50, "hdd_temp": 34, "ssd_temp": None, "fan_duty_pct": 25,
              "drives": {"WD1": {"class": "HDD", "dev": "/dev/sda", "temp": 34}},
              "tachs": {"adt7475_fan1": 3170},
-             "params": {"sys_tgt": 50, "hdd_tgt": 32, "ssd_tgt": 50, "min_fan": 39}}
+             "params": {"sys_tgt": 50, "hdd_tgt": 32, "ssd_tgt": 50,
+                        "min_fan": 39, "max_fan": 255}}
     d = discovery_payload(conf, state)
     assert d["dev"]["ids"] == ["unas"] and "o" in d
     assert d["cmps"]["drive_WD1"]["value_template"] == "{{ value_json.drives['WD1'].temp }}"
     assert d["cmps"]["hdd_tgt"]["p"] == "number" and d["cmps"]["hdd_tgt"]["max"] == 45
+    assert d["cmps"]["max_fan_pct"]["value_template"] == \
+        "{{ (value_json.params.max_fan * 100 / 255) | round(0) }}"
     assert d["cmps"]["tach_adt7475_fan1"]["unit_of_measurement"] == "rpm"
     assert "hdd_temp" in d["cmps"] and "ssd_temp" not in d["cmps"]  # null class omitted
     assert all("unique_id" in c for c in d["cmps"].values())

@@ -190,12 +190,13 @@ it. See [MQTT.md](MQTT.md) for setup, entities, and uninstall.
 Adjust the `fan_control.sh` parameters to suit your needs. These fan curves, specifically `MAX` and `TGT` temps, are currently set to keep the drives under 40ºC in a warm cabinet (30ºC ambient).
 
 - `SYS_TGT=50`: The target system temp (hottest of the CPU die and board sensors) in celcius, at which fans will run at `MIN_FAN`.
-- `SYS_MAX=75`: The max system temp in celcius, where fans will run at 100%.
+- `SYS_MAX=85`: The max system temp in celcius, where fans will run at 100%.
 - `HDD_TGT=32`: The target HDD temp in celcius, at which fans will run at `MIN_FAN`.
-- `HDD_MAX=50`: The max HDD temp in celcius, where fans will run at 100%.
+- `HDD_MAX=55`: The max HDD temp in celcius, where fans will run at 100%.
 - `SSD_TGT=50`: The target SSD/NVMe temp in celcius, at which fans will run at `MIN_FAN`.
 - `SSD_MAX=70`: The max SSD/NVMe temp in celcius, where fans will run at 100%. Tuned for NVMe drives with little airflow, and safe for SATA SSDs too.
 - `MIN_FAN=39`: The minimum fan speed, 15% of 255 (fan speeds are out of 255).
+- `MAX_FAN=255`: The fan speed ceiling the curves ramp to at their MAX temps. Reduce to cap fan noise — note this caps the fans even when overheating. A value below `MIN_FAN` or above 255 is treated as invalid and the full range is used.
 
 Fan speed is set linearly between the TGT temp (`MIN_FAN` fan speed) and MAX temp (100% fan speed). All sensors and fans are auto-detected: system temperatures come from the SoC thermal zones (the CPU die) and the board sensors on the fan-controller chip, while drives are discovered via SMART and classified as HDD or SSD (both SATA SSDs and NVMe), each with their own fan curve. The hottest sensor within each class sets that class's temp, and the highest computed fan speed across the system, HDD, and SSD curves is used. Every PWM channel on each detected fan-controller chip is then driven (drive and PSU/PMBus chips are skipped, so a PSU/BMC-managed fan is never touched). Pseudocode and fan speed chart below.
 
@@ -215,8 +216,9 @@ SSD_RATIO = clip((SSD_TEMP - SSD_TGT) / (SSD_MAX - SSD_TGT), 0, 1)
 # The hottest sensor (relative to its own curve) wins.
 RATIO = max(SYS_RATIO, HDD_RATIO, SSD_RATIO)
 
-# Map 0..1 onto the fan range: MIN_FAN at the target, 100% at the max.
-FAN_SPEED = MIN_FAN + RATIO * (100% - MIN_FAN)
+# Map 0..1 onto the fan range: MIN_FAN at the target, MAX_FAN (default 100%)
+# at the max.
+FAN_SPEED = MIN_FAN + RATIO * (MAX_FAN - MIN_FAN)
 ```
 
 <details>
