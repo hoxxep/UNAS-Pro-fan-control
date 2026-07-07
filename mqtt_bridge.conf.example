@@ -1,0 +1,34 @@
+# MQTT bridge configuration for UNAS-Pro-fan-control.
+#
+# Copy to /root/mqtt_bridge.conf, edit, then: systemctl restart mqtt_bridge
+# The mqtt_bridge service only runs when /root/mqtt_bridge.conf exists.
+# Keep it private (chmod 600) -- it contains the broker password.
+
+# Broker address (required). For Home Assistant's Mosquitto add-on this is the
+# Home Assistant host.
+MQTT_HOST=192.168.1.10
+MQTT_PORT=1883
+
+# Broker credentials. Create a dedicated user on the broker, e.g.:
+#   mosquitto_passwd /etc/mosquitto/passwd unas
+# Quote the value if it contains a '#' character.
+MQTT_USER=unas
+MQTT_PASS=secret
+
+# Optional TLS. Certificate verification is always on; for a self-signed
+# broker certificate, point MQTT_TLS_CA at the CA (or server) cert file.
+#MQTT_TLS=true
+#MQTT_TLS_CA=/root/mqtt_ca.crt
+
+# Optional overrides. Device ID defaults to the hostname; it becomes part of
+# the MQTT topics and the Home Assistant device identity, so pick something
+# stable — and UNIQUE per device if several UNAS units share one broker.
+# Discovery prefix must match the Home Assistant MQTT integration setting
+# (default: homeassistant).
+#MQTT_DEVICE_ID=unas-pro
+#MQTT_DISCOVERY_PREFIX=homeassistant
+
+# "Visit" link on the Home Assistant device page.
+# Defaults to https://<LAN IP facing the broker>; https:// is prepended if
+# no scheme given.
+#MQTT_DEVICE_URL=https://192.168.1.20
