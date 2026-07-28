@@ -49,7 +49,7 @@ from ustd.statusdb.sdb_client import SDBClient
 
 # --- Defaults (override on the command line) ---------------------------------
 CPU_SETPOINT = 70   # PID["cpu"][0], degrees C
-HDD_SETPOINT = 38   # PID["hdd"][0], degrees C
+HDD_SETPOINT = 40   # PID["hdd"][0], degrees C
 IDLE = 15           # PID[*][6] and standby: fan output with no heat to shift
 HDD_KP = -2         # PID["hdd"][1], stock -1
 HDD_KI = -0.02      # PID["hdd"][2], stock -0.01

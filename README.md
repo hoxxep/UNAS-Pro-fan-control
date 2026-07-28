@@ -9,7 +9,7 @@ So rather than fighting `uhwd` for control of the PWM channels, this project sim
 | Setting | Stock | This project |
 | --- | --- | --- |
 | CPU setpoint | 83°C | **70°C** |
-| HDD setpoint | 48°C | **38°C** |
+| HDD setpoint | 48°C | **40°C** |
 | HDD gains (Kp / Ki) | -1 / -0.01 | **-2 / -0.02** |
 | Idle fan output | 15 | 15 (unchanged) |
 
@@ -136,7 +136,7 @@ The `cpu` and `hdd` setpoints (index 0 of each array) should read back whatever 
 ssh $HOST 'bash -s' < sensors.sh
 ```
 
-Give it 30 minutes after install before judging the temperatures; the PID takes time to settle.
+Wait at least 60 minutes after install before judging the temperatures and fan speeds; the PID algorithm takes time to settle.
 
 ## Tuning
 
