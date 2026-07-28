@@ -4,6 +4,8 @@ This is a fan control service using a linear fan curve that is deployed over SSH
 
 It polls system (CPU and board), HDD, and SSD temps to compute a fan speed once every minute, aiming to run the fans at the quietest speed that also keeps the HDDs under 40ºC (configurable). All temperature sensors and fans are auto-detected, so it adapts from a 2-bay UNAS 2 up to a multi-fan enterprise chassis. It overrides the Ubiquiti quiet/balanced/fast fan presets and persists between reboots and updates.
 
+Note that the Unifi OS PID fan controller will fight with this script for the first 30 minutes and the fan speeds will oscillate back and forth until the PID controller learns that it doesn't need to make any adjustments. This is normal and should settle down after 30 minutes.
+
 Supported devices:
 - UNAS Pro
 - UNAS Pro 4 (confirmed by [@LuaPuglife](https://github.com/hoxxep/UNAS-Pro-fan-control/discussions/9))
