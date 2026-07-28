@@ -1,22 +1,37 @@
 # Fan control service for a UNAS Pro.
 #
+# Retunes UniFi OS's own fan controller (uhwd) at boot by rewriting its PID
+# setpoints in the Status Database. config.fan is volatile: uhwd re-initialises
+# it to the stock defaults on every full reboot, so this unit exists purely to
+# re-apply the setpoints once uhwd is up.
+#
 # Repo: https://github.com/hoxxep/UNAS-Pro-fan-control
 # Author: Liam Gray
 # License: MIT
 
 [Unit]
-Description=Fan Control Based on Temperatures
-After=multi-user.target
+Description=Retune UniFi OS Fan Controller Setpoints
+# uhwd owns config.fan, so it must be running before we can read/write it.
+After=multi-user.target uhwd.service
+Wants=uhwd.service
+# uhwd (and the status DB behind it) can take a while to publish config.fan
+# after boot. Allow plenty of retries before systemd gives up on the unit.
+StartLimitIntervalSec=600
+StartLimitBurst=20
 
 [Service]
-ExecStart=/root/fan_control.sh --service
-# Whenever the service stops for any reason (stop, disable, crash, uninstall),
-# hand the fans back to the chip's automatic thermal control. This guarantees the
-# fans are never left pinned in manual mode at a fixed speed, where they would no
-# longer respond to rising temperatures.
-ExecStopPost=/root/fan_control.sh --restore
-Restart=always
+Type=oneshot
+# Applies the setpoints and restarts uhwd itself to pick them up.
+ExecStart=/usr/bin/python3 /root/fan_control.py --write
+# Keep the unit "active" after the one-shot exits, so `systemctl status` shows
+# whether the setpoints were applied on this boot.
+RemainAfterExit=yes
+# If config.fan isn't published yet, the script exits non-zero; retry until it is.
+Restart=on-failure
+RestartSec=15
 User=root
+# Nothing to undo on stop: the setpoints simply stay until the next reboot
+# re-initialises config.fan (or you switch fan presets in the UniFi UI).
 
 [Install]
 WantedBy=multi-user.target
