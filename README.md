@@ -2,7 +2,7 @@
 
 Retune the fan controller on [Ubiquiti UNAS and UNVR products](https://ui.com/us/en/integrations/network-storage) to keep the HDDs cooler than the stock settings allow.
 
-UniFi OS already has a perfectly good fan controller: `uhwd` runs a PID loop over the CPU and HDD temperatures and drives the fans from it. The problem is only its setpoints — stock aims for **83°C CPU** and **48°C HDD**, which is hotter than most people want their drives to run.
+UniFi OS already has a perfectly good fan controller: `uhwd` runs a PID loop over the CPU, HDD, and NVMe temperatures and computes a fan speed from them. The problem is only its setpoints: stock aims for **83°C CPU** and **48°C HDD**, which is hotter than most people want their drives to run.
 
 So rather than fighting `uhwd` for control of the PWM channels, this project simply **reconfigures it**. `fan_control.py` rewrites the PID setpoints in the UniFi Status Database (`config.fan`) so `uhwd` itself keeps the box cooler:
 
@@ -10,10 +10,11 @@ So rather than fighting `uhwd` for control of the PWM channels, this project sim
 | --- | --- | --- |
 | CPU setpoint | 83°C | **70°C** |
 | HDD setpoint | 48°C | **40°C** |
+| NVMe setpoint | 60°C | 60°C (unchanged) |
 | HDD gains (Kp / Ki) | -1 / -0.01 | **-2 / -0.02** |
 | Idle fan output | 15 | 15 (unchanged) |
 
-Lowering the setpoints does most of the work: the PID ramps the fans up on its own as temperatures rise past the setpoint, and floors at the same quiet minimum as before when the box is idle. The HDD gains are doubled on top of that because drives are slow, high-mass thermal loads, and with the stock gains the loop takes a long time to pull them down to a setpoint this much below stock. There is no second controller fighting for the fans, no manual PWM mode, and no fan speed oscillation.
+Lowering the setpoints does most of the work: the PID ramps the fans up on its own as temperatures rise past the setpoint.
 
 `config.fan` is volatile, so a `fan_control.service` systemd unit re-applies the setpoints on every boot.
 
@@ -52,14 +53,14 @@ The floor and `standby` are both "what the fans do when there's no heat to shift
 
 For reference, the stock UniFi presets only differ in the HDD setpoint (and, for cooling, the floor):
 
-| Preset | CPU setpoint | HDD setpoint | HDD Kp / Ki | Floor |
-| --- | --- | --- | --- | --- |
-| Quiet | 83°C | 53°C | -1 / -0.01 | 15 |
-| Default | 83°C | 48°C | -1 / -0.01 | 15 |
-| Cooling | 83°C | 43°C | -1 / -0.01 | 100 (fans pinned full) |
-| **This project** | **70°C** | **38°C** | **-2 / -0.02** | **15** |
+| Preset | CPU setpoint | HDD setpoint | HDD Kp / Ki | NVMe setpoint | Floor |
+| --- | --- | --- | --- | --- | --- |
+| Quiet | 83°C | 53°C | -1 / -0.01 | 60ºC | 15 |
+| Default | 83°C | 48°C | -1 / -0.01 | 60ºC | 15 |
+| Cooling | 83°C | 43°C | -1 / -0.01 | 60ºC | 100 (fans pinned full) |
+| **This project** | **70°C** | **40°C** | **-2 / -0.02** | **60ºC** | **15** |
 
-`fan_control.py` edits **only** the live top-level config, never `fan["profiles"][...]`. Those are the factory Quiet/Balanced/Cooling presets, and overwriting one would destroy your ability to return to it.
+`fan_control.py` edits **only** the live top-level config, never `fan["profiles"][...]`. Those are the factory Quiet/Balanced/Cooling presets.
 
 ## Requirements
 
@@ -74,13 +75,18 @@ SSH into the device as root and run the installer.
 curl -fsSL https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/install.sh | bash
 ```
 
-You will be presented with the target temperatures to configure, no value will use our defaults, which are lower than the default and are a balance between fan noise and Backblaze's recommended drive temps for longevity.
+You will be presented with the target temperatures to configure, no value will use our defaults, which are lower than the default and are a balance between fan noise and lower drive temps for longevity. 
+
 ```
-Setpoints (press enter to accept the default):
-  Target CPU temperature in C  (stock 83) [70]:
-  Target HDD temperature in C  (stock 48) [38]:
-  Minimum fan speed, 0-100     (stock 15) [15]:
+Setpoints -- press enter to accept the recommended value.
+                               current   new
+  Target CPU temperature in C       83   [70]:
+  Target HDD temperature in C       48   [40]:
+  Target NVMe temperature in C      60   [60]:
+  Minimum fan speed, 0-100          15   [15]:
 ```
+
+The "current" column is read live out of `config.fan`, so on a re-run it shows what you last installed.
 
 The installer downloads `fan_control.py` to `/root`, checks your setpoints against it read-only before committing to them, and writes a `fan_control.service` systemd unit with them baked into its `ExecStart`. The unit is a one-shot: it applies the setpoints, restarts `uhwd` to pick them up, and exits (staying "active" so `systemctl status` shows whether it ran this boot). It is ordered after `uhwd.service` and retries if `config.fan` isn't published yet.
 
@@ -146,10 +152,11 @@ Re-run the installer. It rewrites the unit and re-applies immediately, so there'
 curl -fsSL https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/install.sh | bash -s -- --hdd 40
 ```
 
-The three settings, all of which `install.sh` prompts for and passes straight through to `fan_control.py`:
+The settings, all of which `install.sh` prompts for and passes straight through to `fan_control.py`:
 
 - `--cpu 70`: target CPU temperature in °C.
-- `--hdd 38`: target HDD temperature in °C. **This is the one to tune.** Lower it for cooler drives and louder fans; raise it for a quieter box.
+- `--hdd 40`: target HDD temperature in °C. **This is the one to tune.** Lower it for cooler drives and louder fans; raise it for a quieter box.
+- `--nvme 60`: target NVMe temperature in °C, on the models that have it. Left at stock; these drives idle well below it.
 - `--idle 15`: fan output with no heat to shift — the per-category PID floor and the global standby output together. Raising it makes the box louder at idle without improving loaded temperatures; leave it alone unless you want more constant baseline airflow.
 
 To try a change without installing anything, `fan_control.py` is read-only unless given `--write`:

@@ -38,6 +38,8 @@ offering the default; pass any option to skip the questions.
   --cpu C    CPU setpoint in degrees C (stock 83)
   --hdd C    HDD setpoint in degrees C (stock 48). The one worth tuning:
              lower is cooler and louder.
+  --nvme C   NVMe setpoint in degrees C (stock 60), on the models that
+             have one. Left at stock by default.
   --idle N   Fan output when idle, 0-100 (stock 15). A minimum, not a cap;
              raising it only makes the box louder at idle.
 
@@ -54,14 +56,14 @@ curl -fsSL "${RAW_URL}/fan_control.py" -o "$PY_PATH" \
     || die "could not download ${RAW_URL}/fan_control.py"
 chmod +x "$PY_PATH"
 
-read -r def_cpu def_hdd def_idle < <(python3 "$PY_PATH" --defaults) \
+read -r def_cpu def_hdd def_idle def_nvme < <(python3 "$PY_PATH" --defaults) \
     || die "could not read the defaults from ${PY_PATH}"
 
-# What this box shipped with, for the "stock" column below. Read from the live
-# config rather than hardcoded here, so it is right for the fan preset actually
-# selected in the UniFi UI (on "cooling" the stock idle floor really is 100).
-read -r stock_cpu stock_hdd stock_idle < <(python3 "$PY_PATH" --stock) \
-    || die "could not read the stock values from ${PY_PATH}"
+# What the fans are being run to right now, for the "current" column below. Read
+# from the live config rather than hardcoded here, so a re-run shows what the
+# last install set. cur_nvme is empty on models with no NVMe category.
+read -r cur_cpu cur_hdd cur_idle cur_nvme < <(python3 "$PY_PATH" --current) \
+    || die "could not read the current values from ${PY_PATH}"
 
 # Ask only when there is a terminal to ask on and nothing was passed. When this
 # script is piped from curl, stdin is the script itself, so prompts have to go
@@ -76,8 +78,8 @@ fi
 # Two columns: what the box does now vs what we are about to set it to, with
 # the value in brackets being the one you get by pressing enter.
 ask() {
-    local prompt=$1 stock=$2 default=$3 reply
-    printf '  %-28s %5s   [%s]: ' "$prompt" "$stock" "$default" > /dev/tty
+    local prompt=$1 current=$2 default=$3 reply
+    printf '  %-28s %7s   [%s]: ' "$prompt" "$current" "$default" > /dev/tty
     read -r reply < /dev/tty || reply=""
     printf '%s' "${reply:-$default}"
 }
@@ -87,11 +89,17 @@ while true; do
     if [ "$interactive" = true ]; then
         echo
         echo "Setpoints -- press enter to accept the recommended value."
-        printf '  %-28s %5s   %s\n' "" "stock" "new"
-        cpu=$(ask "Target CPU temperature in C" "$stock_cpu" "$def_cpu")
-        hdd=$(ask "Target HDD temperature in C" "$stock_hdd" "$def_hdd")
-        idle=$(ask "Minimum fan speed, 0-100" "$stock_idle" "$def_idle")
-        args=(--cpu "$cpu" --hdd "$hdd" --idle "$idle")
+        printf '  %-28s %7s   %s\n' "" "current" "new"
+        cpu=$(ask "Target CPU temperature in C" "$cur_cpu" "$def_cpu")
+        hdd=$(ask "Target HDD temperature in C" "$cur_hdd" "$def_hdd")
+        args=(--cpu "$cpu" --hdd "$hdd")
+        # Only worth asking about on the models that have it.
+        if [ -n "$cur_nvme" ]; then
+            nvme=$(ask "Target NVMe temperature in C" "$cur_nvme" "$def_nvme")
+            args+=(--nvme "$nvme")
+        fi
+        idle=$(ask "Minimum fan speed, 0-100" "$cur_idle" "$def_idle")
+        args+=(--idle "$idle")
         echo
     elif [ ${#args[@]} -eq 0 ]; then
         args=(--cpu "$def_cpu" --hdd "$def_hdd" --idle "$def_idle")

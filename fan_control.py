@@ -5,7 +5,8 @@ Instead of fighting uhwd by writing pwm* directly, this edits its PID setpoints
 in the Status Database (config.fan) so uhwd itself keeps the box cooler:
 
   - CPU setpoint -> 70 C   (stock default 83)
-  - HDD setpoint -> 38 C   (stock default 48)
+  - HDD setpoint -> 40 C   (stock default 48)
+  - NVMe setpoint-> 60 C   (stock default 60, on boxes with NVMe drives)
   - HDD gains    -> Kp -2, Ki -0.02  (stock -1 / -0.01)
   - idle output  -> 15     (unchanged from stock)
 
@@ -19,7 +20,8 @@ Index 6 (MIN_FLOOR) is a per-category *minimum* fan output, NOT a max cap. The
 PID floors at this value and ramps UP on its own as the temperature rises past
 the setpoint -- so lowering the setpoint already cools harder on its own.
 (The stock "cooling" preset just sets index 6 to 100, i.e. pins the fans full.)
-Leave it at 15 for a quiet idle; raising it only makes idle louder.
+Leave it at 15 for a quiet idle; raising it only makes idle louder. It is set on
+every category, since they share the fans and one left at 100 pins them at full.
 
 The per-category floor and the global `standby` output are both "what the fans
 do when there's no heat to shift", and stock sets them to the same value, so
@@ -30,7 +32,7 @@ Run on the UNAS as root:
   python3 fan_control.py                      # read-only: current vs proposed
   python3 fan_control.py --write              # apply the change and restart uhwd
   python3 fan_control.py --hdd 40 --write     # apply custom setpoints
-  python3 fan_control.py --restore --write    # put the stock values back
+  python3 fan_control.py --restore --write    # put the factory values back
 
 NOTE: config.fan is volatile -- uhwd re-initialises it to stock defaults on a
 full reboot (a plain `systemctl restart uhwd` keeps these values). To make it
@@ -50,12 +52,14 @@ from ustd.statusdb.sdb_client import SDBClient
 # --- Defaults (override on the command line) ---------------------------------
 CPU_SETPOINT = 70   # PID["cpu"][0], degrees C
 HDD_SETPOINT = 40   # PID["hdd"][0], degrees C
+NVME_SETPOINT = 60  # PID["nvme"][0], degrees C. Stock: these drives idle in the
+                    # low 50s, so lowering it only adds fan noise.
 IDLE = 15           # PID[*][6] and standby: fan output with no heat to shift
 HDD_KP = -2         # PID["hdd"][1], stock -1
 HDD_KI = -0.02      # PID["hdd"][2], stock -0.01
 # -----------------------------------------------------------------------------
 
-# Only used when the factory profile can't be read; see stock_values().
+# Only used when the live config can't be read; see current_values().
 STOCK_CPU = 83
 STOCK_HDD = 48
 STOCK_IDLE = 15
@@ -103,18 +107,21 @@ def check_shape(pid):
         )
 
 
-def retune(fan, cpu, hdd, idle):
-    """Set the CPU/HDD setpoints, the HDD gains, and the idle fan output, in place."""
+def retune(fan, cpu, hdd, nvme, idle):
+    """Set the setpoints, the HDD gains, and the idle fan output, in place."""
     pid = fan["PID"]
     check_shape(pid)
-    if "cpu" in pid:
-        pid["cpu"][SETPOINT_IDX] = cpu
-        pid["cpu"][FLOOR_IDX] = idle
+    setpoints = {"cpu": cpu, "hdd": hdd, "nvme": nvme}
+    for name, values in pid.items():
+        if name in setpoints:
+            values[SETPOINT_IDX] = setpoints[name]
+        # Every category, not just the ones we set a setpoint for: they share
+        # the fans, so one left at 100 (as the "cooling" preset sets them all)
+        # pins the fans at full.
+        values[FLOOR_IDX] = idle
     if "hdd" in pid:
-        pid["hdd"][SETPOINT_IDX] = hdd
         pid["hdd"][KP_IDX] = HDD_KP
         pid["hdd"][KI_IDX] = HDD_KI
-        pid["hdd"][FLOOR_IDX] = idle
     fan["standby"] = idle
 
 
@@ -140,21 +147,19 @@ def restore(fan):
     return name if name in profiles else "default"
 
 
-def stock_values(fan):
-    """This box's factory (cpu, hdd, idle), for showing next to our defaults.
+def current_values(fan):
+    """What the fans are being run to now: (cpu, hdd, idle, nvme).
 
-    Read from fan["profiles"], which we never write to, so it stays the truth
-    about what the box shipped with even after a retune -- and it follows the
-    preset picked in the UniFi UI, e.g. "cooling" really does idle at 100.
-    Falls back to the STOCK_* constants for anything missing, since this only
-    feeds a display: the real config is validated when we come to write it.
+    Read from the live top-level config, so on a re-run this reports what the
+    last install set rather than what the box shipped with. Falls back to the
+    STOCK_* constants for anything missing, since this only feeds a display:
+    the real config is validated when we come to write it. `nvme` is None on
+    the models that have no such category.
     """
     fan = fan or {}
-    profiles = fan.get("profiles") or {}
-    profile = profiles.get(fan.get("active_profile")) or profiles.get("default") or {}
-    pid = profile.get("PID") or {}
+    pid = fan.get("PID") or {}
 
-    def value(name, index, fallback):
+    def value(name, index, fallback=None):
         values = pid.get(name)
         if isinstance(values, list) and len(values) > index:
             if isinstance(values[index], (int, float)) and not isinstance(values[index], bool):
@@ -164,7 +169,8 @@ def stock_values(fan):
     return (
         value("cpu", SETPOINT_IDX, STOCK_CPU),
         value("hdd", SETPOINT_IDX, STOCK_HDD),
-        value("hdd", FLOOR_IDX, profile.get("standby", STOCK_IDLE)),
+        value("hdd", FLOOR_IDX, fan.get("standby", STOCK_IDLE)),
+        value("nvme", SETPOINT_IDX),
     )
 
 
@@ -209,6 +215,14 @@ def main():
         help=f"HDD setpoint in degrees C (default {HDD_SETPOINT}, stock {STOCK_HDD})",
     )
     parser.add_argument(
+        "--nvme",
+        type=temperature(35, 75),
+        default=NVME_SETPOINT,
+        metavar="C",
+        help=f"NVMe setpoint in degrees C, on the models that have one "
+             f"(default {NVME_SETPOINT}, i.e. stock)",
+    )
+    parser.add_argument(
         "--idle",
         type=temperature(0, 100),
         default=IDLE,
@@ -226,28 +240,31 @@ def main():
     parser.add_argument(
         "--defaults",
         action="store_true",
-        help="print the built-in defaults as 'cpu hdd idle' and exit; lets "
+        help="print the built-in defaults as 'cpu hdd idle nvme' and exit; lets "
              "install.sh show them without keeping its own copy",
     )
     parser.add_argument(
-        "--stock",
+        "--current",
         action="store_true",
-        help="print this box's factory values as 'cpu hdd idle' and exit, read "
-             "from the active preset's stored profile",
+        help="print this box's live values as 'cpu hdd idle nvme' and exit, with "
+             "nvme omitted on boxes that have no NVMe category",
     )
     args = parser.parse_args()
 
     if args.defaults:
-        print(CPU_SETPOINT, HDD_SETPOINT, IDLE)
+        print(CPU_SETPOINT, HDD_SETPOINT, IDLE, NVME_SETPOINT)
         return
 
-    if args.stock:
+    if args.current:
         try:
             fan = connect().get("config.fan")
         except Exception:  # uhwd down, no SDB -- fall back to the constants
             fan = None
-        # Whole numbers come back as floats; print them as the ints they are.
-        print(*(int(v) if float(v).is_integer() else v for v in stock_values(fan)))
+        # nvme is last so it can simply be absent, leaving a shell caller's
+        # `read -r cpu hdd idle nvme` with an empty nvme. Whole numbers come
+        # back as floats; print them as the ints they are.
+        values = [v for v in current_values(fan) if v is not None]
+        print(*(int(v) if float(v).is_integer() else v for v in values))
         return
 
     c = connect()
@@ -267,7 +284,7 @@ def main():
         # including via --restore above. If uhwd re-derives the live config from
         # the active profile (e.g. when you switch presets in the UI), these
         # values revert; persist them by re-running at boot instead.
-        retune(fan, args.cpu, args.hdd, args.idle)
+        retune(fan, args.cpu, args.hdd, args.nvme, args.idle)
 
     show("New     " if args.write else "Proposed", fan)
 
