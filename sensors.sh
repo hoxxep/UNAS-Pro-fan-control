@@ -59,9 +59,11 @@ for h in /sys/class/hwmon/hwmon*; do
     done
 
     # PWM outputs and their control mode (skip pwmN_enable/_mode siblings).
-    # The enable flag matters for safety: a channel stuck on 1 (manual) is being
-    # held at a fixed speed by fan_control.sh and will not respond to heat if the
-    # service has stopped. Run `fan_control.sh --restore` to return them to 2.
+    # The enable flag matters for safety, but note mode 1 (manual) is shared: it
+    # is used both by fan_control.sh AND by UniFi OS's own fan daemon on newer
+    # builds, so mode 1 alone does not tell you which one is driving the speed.
+    # Run `fan_control.sh --restore` to hand control back (to the chip curve or
+    # the UniFi daemon, whichever the firmware supports).
     for p in "$h"/pwm*; do
         [[ -e "$p" ]] || continue
         bn="$(basename "$p")"
@@ -69,7 +71,7 @@ for h in /sys/class/hwmon/hwmon*; do
         en="$(read_raw "${p}_enable")"
         case "$en" in
             0)  mode="no SW control / full speed" ;;
-            1)  mode="manual (fan_control sets this)" ;;
+            1)  mode="manual (fan_control.sh or UniFi OS daemon)" ;;
             \?) mode="" ;;
             *)  mode="automatic / chip curve" ;;
         esac
@@ -99,6 +101,7 @@ fi
 echo
 echo "------------------------------------------------------------------"
 echo "pwm enable legend:  0 = no software control (firmware/full speed)"
-echo "                    1 = manual (fan_control.sh sets the value)"
-echo "                    2+ = automatic / chip thermal curve"
+echo "                    1 = manual (fan_control.sh OR UniFi OS fan daemon)"
+echo "                    2+ = automatic / chip thermal curve (rejected on some"
+echo "                         newer UniFi OS builds, which do fan control in SW)"
 echo "------------------------------------------------------------------"

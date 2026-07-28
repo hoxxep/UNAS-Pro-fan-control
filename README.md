@@ -140,6 +140,9 @@ suspect the fans are stuck (e.g. after a crash, or if the script was deleted
 without stopping the service first). `sensors.sh` reports each PWM channel's
 `enable` mode, so you can confirm whether a fan is still in manual mode.
 
+We also recommend changing the fan mode in the Unifi OS and/or rebooting to
+reset the default PID fan controller.
+
 </details>
 
 <details>

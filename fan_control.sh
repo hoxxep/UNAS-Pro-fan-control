@@ -342,9 +342,22 @@ set_fan_speed() {
 # heat. restore_auto() reverses that: it is run by `--restore` and by the
 # systemd ExecStopPost hook, so stopping the service is always thermally safe.
 #
-# pwm*_enable=2 = the chip's own automatic temperature curve (quiet and safe). If
-# a chip rejects 2, we fall back to 0 (= no software control / full speed), which
-# is loud but can never leave the fans pinned too low.
+# We hand control back in order of preference, stopping at the first value the
+# chip accepts:
+#   2 = the chip's own automatic temperature curve. The classic "safe" mode, but
+#       newer UniFi OS builds don't configure the adt7475 auto curve and reject a
+#       write of 2 (EINVAL), because fan control is done in software instead.
+#   1 = manual mode, left for UniFi OS's own fan daemon to drive. On builds that
+#       reject 2, the presets (Quiet/Balanced/Fast) are the daemon writing pwm*
+#       in this mode, so handing back to 1 (and NOT writing pwm* afterwards) lets
+#       the daemon resume control. This is the normal restore path on newer OSes.
+#   0 = no software control. Last resort only: on the adt7475 this forces the fan
+#       to full speed AND makes the channel ignore pwm* writes, so the OS daemon
+#       can no longer bring it down (loud, but never pinned dangerously low).
+# We deliberately do NOT write pwm* here, so whichever controller (chip curve or
+# UniFi daemon) now owns the channel is free to set the speed.
+#
+# We recommend rebooting afterwards to reset the Unifi OS PID fan controller.
 restore_auto() {
     local hw name p bn mode found=0
     for hw in /sys/class/hwmon/hwmon*; do
@@ -360,11 +373,12 @@ restore_auto() {
             [[ "$bn" =~ ^pwm[0-9]+$ ]] || continue
             [[ -w "${p}_enable" ]] || continue
             found=1
-            if echo 2 > "${p}_enable" 2>/dev/null; then :; else
-                echo 0 > "${p}_enable" 2>/dev/null || true
+            if echo 2 > "${p}_enable" 2>/dev/null; then :;
+            elif echo 1 > "${p}_enable" 2>/dev/null; then :;
+            else echo 0 > "${p}_enable" 2>/dev/null || true;
             fi
             mode="$(cat "${p}_enable" 2>/dev/null || echo '?')"
-            log_echo "Restored ${p}_enable (${name}) to ${mode} (2=automatic, 0=full speed)."
+            log_echo "Restored ${p}_enable (${name}) to ${mode} (2=chip auto, 1=UniFi OS daemon, 0=full speed)."
         done
     done
     if (( found == 0 )); then
