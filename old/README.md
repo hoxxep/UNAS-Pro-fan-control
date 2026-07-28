@@ -198,7 +198,7 @@ Adjust the `fan_control.sh` parameters to suit your needs. These fan curves, spe
 
 Fan speed is set linearly between the TGT temp (`MIN_FAN` fan speed) and MAX temp (100% fan speed). All sensors and fans are auto-detected: system temperatures come from the SoC thermal zones (the CPU die) and the board sensors on the fan-controller chip, while drives are discovered via SMART and classified as HDD or SSD (both SATA SSDs and NVMe), each with their own fan curve. The hottest sensor within each class sets that class's temp, and the highest computed fan speed across the system, HDD, and SSD curves is used. Every PWM channel on each detected fan-controller chip is then driven (drive and PSU/PMBus chips are skipped, so a PSU/BMC-managed fan is never touched). Pseudocode and fan speed chart below.
 
-![Default fan speed chart](https://github.com/hoxxep/UNAS-Pro-fan-control/blob/main/charts/CHART.png?raw=true)
+![Default fan speed chart](https://github.com/hoxxep/UNAS-Pro-fan-control/blob/main/old/charts/CHART.png?raw=true)
 
 ```python
 SYS_TEMP = max(CPU die temps + board sensor temps)
