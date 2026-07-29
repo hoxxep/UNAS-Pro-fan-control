@@ -3,9 +3,10 @@
 # Sensor discovery for UNAS/UNVR devices.
 #
 # READ-ONLY: dumps every hwmon chip, thermal zone, and fan/PWM channel together
-# with its kernel name and label. It does NOT change any fan speed. Use it to
-# see exactly what each temperature sensor and fan is, so fan_control.sh can map
-# them correctly across the device range (UNAS 2 ... EUNAS/ENVR).
+# with its kernel name and label, plus each SMART drive's temperature. It does
+# NOT change any fan speed. Use it to check the effect of the setpoints
+# fan_control.py hands to uhwd, and to see exactly what each temperature sensor,
+# drive, and fan is across the device range (UNAS 2 ... EUNAS/ENVR).
 #
 # Run on the device:        /root/sensors.sh
 # Or without installing:    ssh HOST 'bash -s' < sensors.sh
@@ -59,11 +60,9 @@ for h in /sys/class/hwmon/hwmon*; do
     done
 
     # PWM outputs and their control mode (skip pwmN_enable/_mode siblings).
-    # The enable flag matters for safety, but note mode 1 (manual) is shared: it
-    # is used both by fan_control.sh AND by UniFi OS's own fan daemon on newer
-    # builds, so mode 1 alone does not tell you which one is driving the speed.
-    # Run `fan_control.sh --restore` to hand control back (to the chip curve or
-    # the UniFi daemon, whichever the firmware supports).
+    # Mode 1 (manual) is the normal state here: UniFi OS's own fan daemon, uhwd,
+    # drives the PWM in software from its PID loop. Nothing in this repo writes
+    # pwm* directly; fan_control.py only retunes uhwd's setpoints.
     for p in "$h"/pwm*; do
         [[ -e "$p" ]] || continue
         bn="$(basename "$p")"
@@ -71,13 +70,21 @@ for h in /sys/class/hwmon/hwmon*; do
         en="$(read_raw "${p}_enable")"
         case "$en" in
             0)  mode="no SW control / full speed" ;;
-            1)  mode="manual (fan_control.sh or UniFi OS daemon)" ;;
+            1)  mode="manual (UniFi OS uhwd daemon)" ;;
             \?) mode="" ;;
             *)  mode="automatic / chip curve" ;;
         esac
         printf "   %-12s val=%-4s enable=%-2s %s\n" "$bn" "$(read_raw "$p")" "$en" "$mode"
     done
 done
+
+echo
+echo "------------------------------------------------------------------"
+echo "pwm enable legend:  0 = no software control (firmware/full speed)"
+echo "                    1 = manual (expected: uhwd drives the fans in software)"
+echo "                    2+ = automatic / chip thermal curve (rejected on the"
+echo "                         UniFi OS builds that do fan control in software)"
+echo "------------------------------------------------------------------"
 
 echo
 echo "=================================================================="
@@ -99,9 +106,109 @@ if command -v sensors >/dev/null 2>&1; then
 fi
 
 echo
-echo "------------------------------------------------------------------"
-echo "pwm enable legend:  0 = no software control (firmware/full speed)"
-echo "                    1 = manual (fan_control.sh OR UniFi OS fan daemon)"
-echo "                    2+ = automatic / chip thermal curve (rejected on some"
-echo "                         newer UniFi OS builds, which do fan control in SW)"
-echo "------------------------------------------------------------------"
+echo "=================================================================="
+echo " drives             smartctl --scan-open"
+echo "   (HDD/SSD temps via SMART: what uhwd's hdd/nvme PID loops track)"
+echo "=================================================================="
+if ! command -v smartctl >/dev/null 2>&1; then
+    echo "   smartctl not found (install smartmontools) - skipping drives."
+elif ! command -v jq >/dev/null 2>&1; then
+    echo "   jq not found - skipping drives (this script needs it to read SMART)."
+else
+    scan="$(smartctl --json=c --scan-open 2>/dev/null || true)"
+    found=0
+    while IFS=$'\t' read -r dev dtype; do
+        [[ -n "$dev" ]] || continue
+        found=1
+
+        args=(--json=c --all)
+        [[ -n "$dtype" ]] && args+=(-d "$dtype")
+
+        json="$(smartctl "${args[@]}" "$dev" 2>/dev/null || true)"
+        if [[ -z "$json" ]]; then
+            printf "   %-16s %5s      %s\n" "$dev" "?" "smartctl returned nothing"
+            continue
+        fi
+
+        # Current temperature, HDD/SSD class (roughly uhwd's hdd vs nvme PID
+        # categories), and the model/rotation so an unknown drive can be
+        # identified from the output. Temperature is "?" rather than dropped, so
+        # a drive that reports none is still visible as a drive that's present.
+        line="$(jq -r '
+            def trunc_c:
+              if type == "number" then
+                tostring | match("^-?[0-9]+").string | tonumber
+              elif type == "string" then
+                capture("^\\s*(?<n>-?[0-9]+)(?:\\.[0-9]+)?(?:\\s|$|[C(/])").n | tonumber
+              else
+                empty
+              end;
+
+            def sane:
+              select(. >= -40 and . <= 150);
+
+            def current_from_top:
+              .temperature.current? | trunc_c | sane;
+
+            def current_from_nvme_fallback:
+              .nvme_smart_health_information_log.temperature? | trunc_c | sane;
+
+            def current_from_ata_attr_fallback:
+              [
+                (.ata_smart_attributes.table // [])[]
+                | select(
+                    (.id == 194) or
+                    (.id == 190 and ((.name // "") | test("(?i)(temperature|temp|airflow)"))) or
+                    ((.name // "") | test("(?i)^(Temperature_Celsius|Airflow_Temperature_Cel|Drive_Temperature|Current_Temperature)$"))
+                  )
+                | {
+                    priority: (
+                      if .id == 194 then 0
+                      elif .id == 190 then 1
+                      else 2
+                      end
+                    ),
+                    value: (
+                      try ((.raw.string // .raw.value) | trunc_c | sane)
+                      catch empty
+                    )
+                  }
+                | select(.value != null)
+              ]
+              | sort_by(.priority)
+              | .[0].value?;
+
+            def device_class:
+              if (.device.type? == "nvme") or (.nvme_smart_health_information_log? != null) then "SSD"
+              elif (.rotation_rate? == 0) then "SSD"
+              else "HDD"
+              end;
+
+            ([current_from_top, current_from_nvme_fallback, current_from_ata_attr_fallback] | first(.[]?)) as $temp
+            | [
+                (device_class),
+                ($temp // "?" | tostring),
+                ((.model_name // .scsi_model_name // "?") | tostring),
+                (if (.rotation_rate? // null) == null then ""
+                 elif .rotation_rate == 0 then "non-rotating"
+                 else "\(.rotation_rate) rpm"
+                 end)
+              ] | @tsv
+        ' <<< "$json" 2>/dev/null || true)"
+
+        if [[ -z "$line" ]]; then
+            printf "   %-16s %5s      %s\n" "$dev" "?" "could not parse smartctl JSON"
+            continue
+        fi
+
+        IFS=$'\t' read -r class temp model rpm <<< "$line"
+        [[ "$temp" == "?" ]] || temp="${temp}°C"
+        printf "   %-16s %6s  class=%-3s type=%-6s model=%s%s\n" \
+            "$dev" "$temp" "$class" "${dtype:-auto}" "$model" \
+            "${rpm:+ ($rpm)}"
+    done < <(jq -r '.devices[]? | [.name, (.type // "")] | @tsv' <<< "$scan" 2>/dev/null)
+
+    if (( found == 0 )); then
+        echo "   No SMART devices found by 'smartctl --scan-open'."
+    fi
+fi

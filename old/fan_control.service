@@ -1,0 +1,22 @@
+# Fan control service for a UNAS Pro.
+#
+# Repo: https://github.com/hoxxep/UNAS-Pro-fan-control
+# Author: Liam Gray
+# License: MIT
+
+[Unit]
+Description=Fan Control Based on Temperatures
+After=multi-user.target
+
+[Service]
+ExecStart=/root/fan_control.sh --service
+# Whenever the service stops for any reason (stop, disable, crash, uninstall),
+# hand the fans back to the chip's automatic thermal control. This guarantees the
+# fans are never left pinned in manual mode at a fixed speed, where they would no
+# longer respond to rising temperatures.
+ExecStopPost=/root/fan_control.sh --restore
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
