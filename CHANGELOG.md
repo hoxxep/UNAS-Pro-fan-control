@@ -31,7 +31,9 @@ every start of the old script.
   both files, and restarts `uhwd`, again with no reboot needed.
 - `sensors.sh` now dumps each SMART drive's temperature alongside the hwmon and
   thermal-zone data, so one read-only run shows both what `uhwd`'s PID loops
-  track and the fan speeds that result.
+  track and the fan speeds that result. `install.sh` now puts it in `/root` too
+  (and `uninstall.sh` removes it), since the installer runs on the device, where
+  there is no checkout to pipe it from.
 
 ### Changed
 - The systemd unit is now a one-shot: it applies the setpoints, restarts `uhwd`

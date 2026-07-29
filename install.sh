@@ -20,6 +20,7 @@ set -euo pipefail
 #   RAW_URL=file:///root/fan-test bash /root/fan-test/install.sh
 RAW_URL="${RAW_URL:-https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main}"
 PY_PATH=/root/fan_control.py
+SENSORS_PATH=/root/sensors.sh
 UNIT_NAME=fan_control.service
 UNIT_PATH="/etc/systemd/system/${UNIT_NAME}"
 # The pre-uhwd version of this project, replaced by PY_PATH under the same unit
@@ -58,6 +59,19 @@ echo "==> Downloading fan_control.py"
 curl -fsSL "${RAW_URL}/fan_control.py" -o "$PY_PATH" \
     || die "could not download ${RAW_URL}/fan_control.py"
 chmod +x "$PY_PATH"
+
+# sensors.sh comes along for the ride: it is the tool for checking what the
+# setpoints actually did, and anyone running this installer is on the device
+# with no checkout to pipe it from. Read-only and not needed by the service, so
+# a failed download is a warning rather than a dead install.
+echo "==> Downloading sensors.sh"
+if curl -fsSL "${RAW_URL}/sensors.sh" -o "$SENSORS_PATH"; then
+    chmod +x "$SENSORS_PATH"
+else
+    rm -f "$SENSORS_PATH"
+    echo "    warning: could not download ${RAW_URL}/sensors.sh -- skipping it." >&2
+    echo "    It is only a read-only diagnostic; the install continues." >&2
+fi
 
 read -r def_cpu def_hdd def_idle def_nvme < <(python3 "$PY_PATH" --defaults) \
     || die "could not read the defaults from ${PY_PATH}"
@@ -202,6 +216,7 @@ cat <<EOF
 Installed.
 
   Check      python3 ${PY_PATH}
+  Sensors    ${SENSORS_PATH}
   Retune     re-run this installer
   Uninstall  curl -fsSL ${RAW_URL}/uninstall.sh | bash
 
