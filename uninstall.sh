@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 # Remove the UNAS/UNVR fan control service and put the stock setpoints back.
-# Run ON the device, as root.
+# Run ON the device, as root. Also removes the fan_sensors.sh diagnostic that
+# install.sh dropped alongside it.
 #
 #   curl -fsSL $REPO/uninstall.sh | bash
 #
@@ -16,6 +17,7 @@
 set -euo pipefail
 
 PY_PATH=/root/fan_control.py
+SENSORS_PATH=/root/fan_sensors.sh
 UNIT_NAME=fan_control.service
 UNIT_PATH="/etc/systemd/system/${UNIT_NAME}"
 
@@ -38,6 +40,18 @@ fi
 
 echo "==> Removing files"
 rm -f "$PY_PATH" "$UNIT_PATH"
+echo "    Removed ${PY_PATH} and ${UNIT_PATH}"
+# fan_sensors.sh is only on the device because install.sh put it there, so it
+# goes too -- but only once its header confirms it is ours, in case something
+# else has since claimed the path.
+if [ -f "$SENSORS_PATH" ]; then
+    if grep -q 'UNAS-Pro-fan-control' "$SENSORS_PATH" 2>/dev/null; then
+        rm -f "$SENSORS_PATH"
+        echo "    Removed ${SENSORS_PATH}"
+    else
+        echo "    Left ${SENSORS_PATH} in place: it is not from this project."
+    fi
+fi
 systemctl daemon-reload
 
 echo

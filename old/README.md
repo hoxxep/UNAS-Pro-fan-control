@@ -25,7 +25,7 @@ Supported devices:
 As of June 2026, all current UNAS and UNVR models are supported. This section is specifically for future devices, thank you!
 
 Please follow this checklist when confirming device support:
-- Run the `/root/fan_control.sh` script manually on your UNAS (or `query.sh` remotely), which will output logs with sensor readings. To dump the full sensor and fan topology (chip names, temp labels, fan RPM and PWM channels) — especially useful when confirming a new device — run `sensors.sh`. It's read-only and needn't be installed: `ssh $HOST 'bash -s' < sensors.sh`.
+- Run the `/root/fan_control.sh` script manually on your UNAS (or `query.sh` remotely), which will output logs with sensor readings. To dump the full sensor and fan topology (chip names, temp labels, fan RPM and PWM channels) — especially useful when confirming a new device — run `fan_sensors.sh`. It's read-only and needn't be installed: `ssh $HOST 'bash -s' < fan_sensors.sh`.
 - Confirm the system (CPU and board), HDD, and any SSD/NVMe temperature sensors are reading correctly, and there is a reading for each of your installed drives. The system temperature is the hottest of the CPU die (a `cpu-thermal`/SoC thermal zone) and the board/airflow sensors on the fan-controller chip (an `adt7475` here). Example output below (from a UNAS Pro 8 with 8 HDDs and 2 NVMe cache drives).
     ```
     /sys/class/thermal/thermal_zone0/temp (cpu-thermal) System Temperature: 55°C
@@ -141,7 +141,7 @@ temperature control at any time:
 
 This is safe to run anytime and is the recommended first step if you ever
 suspect the fans are stuck (e.g. after a crash, or if the script was deleted
-without stopping the service first). `sensors.sh` reports each PWM channel's
+without stopping the service first). `fan_sensors.sh` reports each PWM channel's
 `enable` mode, so you can confirm whether a fan is still in manual mode.
 
 We also recommend changing the fan mode in the Unifi OS and/or rebooting to

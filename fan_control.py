@@ -295,7 +295,7 @@ def main():
     c.update("config.fan", fan)
     print("\nconfig.fan updated. Restarting uhwd to apply...")
     subprocess.run(["systemctl", "restart", "uhwd"], check=False)
-    print("Done. Watch temps/fan RPM with: bash sensors.sh")
+    print("Done. Watch temps/fan RPM with: bash fan_sensors.sh")
 
 
 if __name__ == "__main__":

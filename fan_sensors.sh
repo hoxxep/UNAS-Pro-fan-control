@@ -8,8 +8,8 @@
 # fan_control.py hands to uhwd, and to see exactly what each temperature sensor,
 # drive, and fan is across the device range (UNAS 2 ... EUNAS/ENVR).
 #
-# Run on the device:        /root/sensors.sh
-# Or without installing:    ssh HOST 'bash -s' < sensors.sh
+# Run on the device:        /root/fan_sensors.sh
+# Or without installing:    ssh HOST 'bash -s' < fan_sensors.sh
 #
 # Please paste the output into a GitHub issue when confirming a new device.
 #
