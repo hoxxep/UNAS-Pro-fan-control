@@ -29,8 +29,8 @@ every start of the old script.
   it works piped from `curl`.
 - `uninstall.sh`: disables the service, restores the stock setpoints, removes
   both files, and restarts `uhwd`, again with no reboot needed.
-- `sensors.sh` now dumps each SMART drive's temperature alongside the hwmon and
-  thermal-zone data, so one read-only run shows both what `uhwd`'s PID loops
+- `fan_sensors.sh` now dumps each SMART drive's temperature alongside the hwmon
+  and thermal-zone data, so one read-only run shows both what `uhwd`'s PID loops
   track and the fan speeds that result. `install.sh` now puts it in `/root` too
   (and `uninstall.sh` removes it), since the installer runs on the device, where
   there is no checkout to pipe it from.
@@ -46,6 +46,9 @@ every start of the old script.
   can no longer be left pinned at a fixed speed.
 - The old sensor-detection, fan-curve, and PWM-driving implementation is kept in
   [`old/`](old/) for reference, but is no longer recommended.
+- Renamed `sensors.sh` to `fan_sensors.sh`, so that it groups with the other
+  installed files (`ls /root/fan_*`) rather than claiming a generic name in
+  `/root`.
 
 ### Upgrading
 - Both versions use the same `fan_control.service` unit name, so run
@@ -55,7 +58,7 @@ every start of the old script.
 
 ### Dependencies
 - `smartctl` and `jq` are no longer needed to control the fans, only to read
-  drive temperatures in `sensors.sh`. Now requires `python3` and the `ustd`
+  drive temperatures in `fan_sensors.sh`. Now requires `python3` and the `ustd`
   Python package, both preinstalled on UniFi OS.
 
 ## 2026-06-25: Overhaul to support all UNAS devices correctly.

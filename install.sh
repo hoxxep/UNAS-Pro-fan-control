@@ -20,7 +20,7 @@ set -euo pipefail
 #   RAW_URL=file:///root/fan-test bash /root/fan-test/install.sh
 RAW_URL="${RAW_URL:-https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main}"
 PY_PATH=/root/fan_control.py
-SENSORS_PATH=/root/sensors.sh
+SENSORS_PATH=/root/fan_sensors.sh
 UNIT_NAME=fan_control.service
 UNIT_PATH="/etc/systemd/system/${UNIT_NAME}"
 # The pre-uhwd version of this project, replaced by PY_PATH under the same unit
@@ -60,16 +60,16 @@ curl -fsSL "${RAW_URL}/fan_control.py" -o "$PY_PATH" \
     || die "could not download ${RAW_URL}/fan_control.py"
 chmod +x "$PY_PATH"
 
-# sensors.sh comes along for the ride: it is the tool for checking what the
+# fan_sensors.sh comes along for the ride: it is the tool for checking what the
 # setpoints actually did, and anyone running this installer is on the device
 # with no checkout to pipe it from. Read-only and not needed by the service, so
 # a failed download is a warning rather than a dead install.
-echo "==> Downloading sensors.sh"
-if curl -fsSL "${RAW_URL}/sensors.sh" -o "$SENSORS_PATH"; then
+echo "==> Downloading fan_sensors.sh"
+if curl -fsSL "${RAW_URL}/fan_sensors.sh" -o "$SENSORS_PATH"; then
     chmod +x "$SENSORS_PATH"
 else
     rm -f "$SENSORS_PATH"
-    echo "    warning: could not download ${RAW_URL}/sensors.sh -- skipping it." >&2
+    echo "    warning: could not download ${RAW_URL}/fan_sensors.sh -- skipping it." >&2
     echo "    It is only a read-only diagnostic; the install continues." >&2
 fi
 

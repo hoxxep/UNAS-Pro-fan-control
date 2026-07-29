@@ -49,7 +49,7 @@ Setpoints -- press enter to accept the recommended value.
 
 The "current" column is read live out of `config.fan`, so on a re-run it shows what you last installed.
 
-The installer downloads `fan_control.py` to `/root`, checks your setpoints against it read-only before committing to them, and writes a `fan_control.service` systemd unit with them baked into its `ExecStart`. It also drops the read-only `sensors.sh` diagnostic next to it. The unit is a one-shot: it applies the setpoints, restarts `uhwd` to pick them up, and exits (staying "active" so `systemctl status` shows whether it ran this boot). It is ordered after `uhwd.service` and retries if `config.fan` isn't published yet.
+The installer downloads `fan_control.py` to `/root`, checks your setpoints against it read-only before committing to them, and writes a `fan_control.service` systemd unit with them baked into its `ExecStart`. It also drops the read-only `fan_sensors.sh` diagnostic next to it. The unit is a one-shot: it applies the setpoints, restarts `uhwd` to pick them up, and exits (staying "active" so `systemctl status` shows whether it ran this boot). It is ordered after `uhwd.service` and retries if `config.fan` isn't published yet.
 
 <details>
 <summary><strong>Manual install, without the installer</strong></summary>
@@ -97,10 +97,10 @@ Run the script with no arguments for a read-only dump of the live PID config:
 ssh $HOST 'python3 /root/fan_control.py'
 ```
 
-The `cpu` and `hdd` setpoints (index 0 of each array) should read back whatever you installed. To see the resulting drive temperatures and fan RPM, run `sensors.sh`:
+The `cpu` and `hdd` setpoints (index 0 of each array) should read back whatever you installed. To see the resulting drive temperatures and fan RPM, run `fan_sensors.sh`:
 
 ```bash
-ssh $HOST '/root/sensors.sh'
+ssh $HOST '/root/fan_sensors.sh'
 ```
 
 Wait at least 60 minutes after install before judging the temperatures and fan speeds; the PID algorithm takes time to settle.
@@ -130,7 +130,7 @@ systemctl disable --now fan_control.service
 python3 /root/fan_control.py --restore --write
 
 # Remove the files.
-rm /root/fan_control.py /root/sensors.sh /etc/systemd/system/fan_control.service
+rm /root/fan_control.py /root/fan_sensors.sh /etc/systemd/system/fan_control.service
 systemctl daemon-reload
 ```
 
@@ -148,7 +148,7 @@ The current `uhwd`-based approach has been developed and tested on the **UNAS Pr
 Reports for issues with this fan control service are very welcome.
 
 - Run `python3 /root/fan_control.py` (read-only) and confirm `config.fan` is found and has the `PID.cpu` / `PID.hdd` shape described above. The script refuses to write if the PID arrays aren't the expected shape. If you hit that error, or your device has extra or differently-named PID categories, please paste the output into a GitHub issue.
-- Apply the setpoints, then run `sensors.sh` to dump the full sensor and fan topology (chip names, temp labels, drive temperatures, fan RPM and PWM channels). It's read-only and needn't be installed: `ssh $HOST 'bash -s' < sensors.sh`.
+- Apply the setpoints, then run `fan_sensors.sh` to dump the full sensor and fan topology (chip names, temp labels, drive temperatures, fan RPM and PWM channels). It's read-only and needn't be installed: `ssh $HOST 'bash -s' < fan_sensors.sh`.
 - Confirm the fans respond: the tachometers should show your fans spinning faster than before, and the HDD temperatures should settle lower after 30+ minutes of operation.
 
 </details>
