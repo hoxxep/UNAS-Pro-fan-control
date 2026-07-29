@@ -79,8 +79,8 @@ Please raise a GitHub issue to confirm if this script is working (or not!), or t
 To be run on the UNAS Pro directly as root.
 ```bash
 # Download latest fan_control.sh and fan_control.service from GitHub to their destinations
-wget -O /root/fan_control.sh https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/fan_control.sh
-wget -O /etc/systemd/system/fan_control.service https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/fan_control.service
+wget -O /root/fan_control.sh https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/old/fan_control.sh
+wget -O /etc/systemd/system/fan_control.service https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/old/fan_control.service
 
 # Make fan_control executable
 chmod +x /root/fan_control.sh

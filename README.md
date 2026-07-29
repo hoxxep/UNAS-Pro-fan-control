@@ -19,7 +19,9 @@ Lowering the setpoints does most of the work: the PID ramps the fans up on its o
 `config.fan` is volatile, so a `fan_control.service` systemd unit re-applies the setpoints on every boot.
 
 > [!NOTE]
-> This replaces the previous version of this project, which auto-detected sensors and drove the PWM channels directly with its own linear fan curve. That approach fought the UniFi PID controller for ~30 minutes after every start, oscillating the fan speed. It is kept in [`old/`](old/) for reference, but is no longer recommended.
+> **Upgrading from the old `fan_control.sh`?** Just run the installer below. `fan_control.py` replaces the previous version of this project, which auto-detected sensors and drove the PWM channels directly with its own linear fan curve. That approach fought the UniFi PID controller for ~30 minutes after every start, oscillating the fan speed. It is kept in [`old/`](old/) for reference, but is no longer recommended.
+>
+> Both versions use the same `fan_control.service` unit name, so installing this one takes over cleanly: the installer stops the old service, hands the fans back to `uhwd`, deletes `/root/fan_control.sh`, and replaces the unit. There is nothing to remove by hand.
 
 ## How it works
 

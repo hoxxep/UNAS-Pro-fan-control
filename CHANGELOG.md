@@ -4,6 +4,58 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-07-29: Retune UniFi OS's own fan controller instead of driving the fans.
+
+A rewrite of the approach. UniFi OS already runs a perfectly good PID fan
+controller in `uhwd`; the problem was only its setpoints (83°C CPU, 48°C HDD).
+Rather than fighting it for control of the PWM channels, this version simply
+reconfigures it, which removes the ~30 minutes of fan oscillation that followed
+every start of the old script.
+
+### Added
+- `fan_control.py`: rewrites `uhwd`'s PID setpoints in the UniFi Status Database
+  (`config.fan`). Defaults to 70°C CPU and 40°C HDD, with the HDD gains doubled
+  (`Kp`/`Ki` of `-2`/`-0.02`) so the drives reach the much lower setpoint in
+  reasonable time. It is read-only unless given `--write`, and refuses to write
+  at all if the PID arrays are not the expected shape.
+- `--restore` puts the stock setpoints back, read out of the factory profile
+  stored in `config.fan` (which this project never writes to), so whichever
+  preset is selected in the UniFi UI is exactly what you get back. No reboot
+  needed.
+- `install.sh`: downloads the script, prompts for each setpoint against a
+  "current" column read live out of `config.fan`, dry-runs them before
+  committing, and writes a `fan_control.service` unit with them baked into its
+  `ExecStart`. Re-run it to retune. Non-interactive when passed any option, so
+  it works piped from `curl`.
+- `uninstall.sh`: disables the service, restores the stock setpoints, removes
+  both files, and restarts `uhwd`, again with no reboot needed.
+- `sensors.sh` now dumps each SMART drive's temperature alongside the hwmon and
+  thermal-zone data, so one read-only run shows both what `uhwd`'s PID loops
+  track and the fan speeds that result.
+
+### Changed
+- The systemd unit is now a one-shot: it applies the setpoints, restarts `uhwd`
+  to pick them up, and exits, rather than looping once a minute forever. It
+  stays "active" (`RemainAfterExit`) so `systemctl status` shows whether it ran
+  this boot, and retries if `config.fan` has not been published yet. It exists
+  only because `config.fan` is volatile: `uhwd` re-initialises it to the stock
+  defaults on every full reboot.
+- Nothing in this project writes `pwm*` or `pwm*_enable` any more, so the fans
+  can no longer be left pinned at a fixed speed.
+- The old sensor-detection, fan-curve, and PWM-driving implementation is kept in
+  [`old/`](old/) for reference, but is no longer recommended.
+
+### Upgrading
+- Both versions use the same `fan_control.service` unit name, so run
+  `install.sh` as normal. It stops the old service, hands the fans back to
+  `uhwd`, deletes `/root/fan_control.sh`, and replaces the unit. There is
+  nothing to remove by hand.
+
+### Dependencies
+- `smartctl` and `jq` are no longer needed to control the fans, only to read
+  drive temperatures in `sensors.sh`. Now requires `python3` and the `ustd`
+  Python package, both preinstalled on UniFi OS.
+
 ## 2026-06-25: Overhaul to support all UNAS devices correctly.
 
 ### Added

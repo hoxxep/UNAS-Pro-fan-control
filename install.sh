@@ -22,6 +22,9 @@ RAW_URL="${RAW_URL:-https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-contro
 PY_PATH=/root/fan_control.py
 UNIT_NAME=fan_control.service
 UNIT_PATH="/etc/systemd/system/${UNIT_NAME}"
+# The pre-uhwd version of this project, replaced by PY_PATH under the same unit
+# name. See the migration step further down.
+OLD_SH_PATH=/root/fan_control.sh
 
 die() { echo "error: $*" >&2; exit 1; }
 
@@ -119,6 +122,31 @@ while true; do
         || die "fan_control.py rejected these setpoints; nothing has been changed"
     echo "Those setpoints were rejected -- try again." >&2
 done
+
+# Clean up after the previous version of this project, which drove the PWM
+# channels directly from /root/fan_control.sh under this same unit name. Done
+# only once the setpoints above have been validated, so an abandoned install
+# leaves the old setup running rather than half-removed.
+#
+# Order matters: the old unit has to be stopped while systemd still knows its
+# definition, because the daemon-reload below replaces it (along with its
+# `ExecStopPost=... --restore` hook) with ours.
+if [ -f "$OLD_SH_PATH" ]; then
+    if grep -q 'UNAS-Pro-fan-control' "$OLD_SH_PATH" 2>/dev/null; then
+        echo "==> Removing ${OLD_SH_PATH} from the previous version of this project"
+        systemctl stop "$UNIT_NAME" 2>/dev/null || true
+        # The old script held the fans in manual mode; hand them back before
+        # uhwd resumes, in case the ExecStopPost hook did not run.
+        bash "$OLD_SH_PATH" --restore >/dev/null 2>&1 || true
+        rm -f "$OLD_SH_PATH"
+        echo "    Stopped it, handed the fans back to uhwd, and removed the script."
+    else
+        # Not ours: leave it alone, but say so, since the unit is about to be
+        # overwritten and may well be what runs it.
+        echo "==> Note: ${OLD_SH_PATH} exists but is not from this project."
+        echo "    Leaving it in place; ${UNIT_NAME} is about to be replaced."
+    fi
+fi
 
 echo "==> Writing ${UNIT_PATH}"
 cat > "$UNIT_PATH" <<EOF
