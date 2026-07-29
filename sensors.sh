@@ -3,10 +3,10 @@
 # Sensor discovery for UNAS/UNVR devices.
 #
 # READ-ONLY: dumps every hwmon chip, thermal zone, and fan/PWM channel together
-# with its kernel name and label, plus each SMART drive's temperature as
-# fan_control.sh reads it. It does NOT change any fan speed. Use it to see
-# exactly what each temperature sensor, drive, and fan is, so fan_control.sh can
-# map them correctly across the device range (UNAS 2 ... EUNAS/ENVR).
+# with its kernel name and label, plus each SMART drive's temperature. It does
+# NOT change any fan speed. Use it to check the effect of the setpoints
+# fan_control.py hands to uhwd, and to see exactly what each temperature sensor,
+# drive, and fan is across the device range (UNAS 2 ... EUNAS/ENVR).
 #
 # Run on the device:        /root/sensors.sh
 # Or without installing:    ssh HOST 'bash -s' < sensors.sh
@@ -60,11 +60,9 @@ for h in /sys/class/hwmon/hwmon*; do
     done
 
     # PWM outputs and their control mode (skip pwmN_enable/_mode siblings).
-    # The enable flag matters for safety, but note mode 1 (manual) is shared: it
-    # is used both by fan_control.sh AND by UniFi OS's own fan daemon on newer
-    # builds, so mode 1 alone does not tell you which one is driving the speed.
-    # Run `fan_control.sh --restore` to hand control back (to the chip curve or
-    # the UniFi daemon, whichever the firmware supports).
+    # Mode 1 (manual) is the normal state here: UniFi OS's own fan daemon, uhwd,
+    # drives the PWM in software from its PID loop. Nothing in this repo writes
+    # pwm* directly; fan_control.py only retunes uhwd's setpoints.
     for p in "$h"/pwm*; do
         [[ -e "$p" ]] || continue
         bn="$(basename "$p")"
@@ -72,7 +70,7 @@ for h in /sys/class/hwmon/hwmon*; do
         en="$(read_raw "${p}_enable")"
         case "$en" in
             0)  mode="no SW control / full speed" ;;
-            1)  mode="manual (fan_control.sh or UniFi OS daemon)" ;;
+            1)  mode="manual (UniFi OS uhwd daemon)" ;;
             \?) mode="" ;;
             *)  mode="automatic / chip curve" ;;
         esac
@@ -83,9 +81,9 @@ done
 echo
 echo "------------------------------------------------------------------"
 echo "pwm enable legend:  0 = no software control (firmware/full speed)"
-echo "                    1 = manual (fan_control.sh OR UniFi OS fan daemon)"
-echo "                    2+ = automatic / chip thermal curve (rejected on some"
-echo "                         newer UniFi OS builds, which do fan control in SW)"
+echo "                    1 = manual (expected: uhwd drives the fans in software)"
+echo "                    2+ = automatic / chip thermal curve (rejected on the"
+echo "                         UniFi OS builds that do fan control in software)"
 echo "------------------------------------------------------------------"
 
 echo
@@ -110,12 +108,12 @@ fi
 echo
 echo "=================================================================="
 echo " drives             smartctl --scan-open"
-echo "   (HDD/SSD temps as fan_control.sh sees them, via SMART)"
+echo "   (HDD/SSD temps via SMART: what uhwd's hdd/nvme PID loops track)"
 echo "=================================================================="
 if ! command -v smartctl >/dev/null 2>&1; then
     echo "   smartctl not found (install smartmontools) - skipping drives."
 elif ! command -v jq >/dev/null 2>&1; then
-    echo "   jq not found - skipping drives (fan_control.sh needs jq too)."
+    echo "   jq not found - skipping drives (this script needs it to read SMART)."
 else
     scan="$(smartctl --json=c --scan-open 2>/dev/null || true)"
     found=0
@@ -132,10 +130,10 @@ else
             continue
         fi
 
-        # Same temperature/class extraction as fan_control.sh get_disk_temps(),
-        # plus the model/rotation so an unknown drive can be identified from the
-        # output. Temperature is "?" here rather than dropped, so a drive that
-        # reports no temperature is still visible as a drive fan_control.sh sees.
+        # Current temperature, HDD/SSD class (roughly uhwd's hdd vs nvme PID
+        # categories), and the model/rotation so an unknown drive can be
+        # identified from the output. Temperature is "?" rather than dropped, so
+        # a drive that reports none is still visible as a drive that's present.
         line="$(jq -r '
             def trunc_c:
               if type == "number" then
