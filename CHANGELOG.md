@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-08-06: Accept the longer PID arrays published by newer UniFi OS builds.
+
+### Fixed
+- The UNAS 2 (UniFi OS 5.1, Drive 4.3) publishes 11-entry PID arrays rather than
+  the UNAS Pro's 7, so the installer rejected them and wrote nothing
+  ([#21](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/21)). The first
+  seven entries are identical in meaning, with what look like max/min output and
+  integral limits appended, so the extras are now accepted and left untouched.
+  In place of the array length, `fan_control.py` now checks that each of the
+  seven fields it writes still holds the kind of value it should (a setpoint in
+  °C, numeric gains, a bool, an integer target group, a 0-100 floor), which
+  catches a genuinely reordered layout — something the length check never did.
+
 ## 2026-07-29: Retune UniFi OS's own fan controller instead of driving the fans.
 
 A rewrite of the approach. UniFi OS already runs a perfectly good PID fan

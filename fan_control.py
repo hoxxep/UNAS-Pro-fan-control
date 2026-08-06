@@ -10,9 +10,10 @@ in the Status Database (config.fan) so uhwd itself keeps the box cooler:
   - HDD gains    -> Kp -2, Ki -0.02  (stock -1 / -0.01)
   - idle output  -> 15     (unchanged from stock)
 
-Each per-category PID array is:
+Each per-category PID array starts with:
   [ setpoint_C, Kp, Ki, Kd, bool, target_group, MIN_FLOOR ]
-The HDD gains are doubled because drives are slow, high-mass thermal loads: with
+Some builds append further fields (the UNAS 2 publishes 11 entries); those are
+left untouched. The HDD gains are doubled because drives are slow, high-mass thermal loads: with
 the stock gains the loop takes a long time to pull them back down to a setpoint
 this much lower than stock.
 
@@ -69,7 +70,26 @@ SETPOINT_IDX = 0
 KP_IDX = 1
 KI_IDX = 2
 FLOOR_IDX = 6
-PID_LEN = 7
+
+
+def number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+# What each field we write must look like. Checked instead of the array length,
+# so a build that appends fields is accepted while one that reorders the ones we
+# write is still caught. See check_shape().
+PID_FIELDS = (
+    ("setpoint_C", lambda v: number(v) and 0 <= v <= 120),
+    ("Kp", number),
+    ("Ki", number),
+    ("Kd", number),
+    ("bool", lambda v: isinstance(v, bool)),
+    ("target_group", lambda v: isinstance(v, int) and not isinstance(v, bool)),
+    ("MIN_FLOOR", lambda v: number(v) and 0 <= v <= 100),
+)
+PID_LEN = len(PID_FIELDS)
+PID_LAYOUT = "[" + ", ".join(name for name, _ in PID_FIELDS) + "]"
 
 # The keys uhwd derives from the active profile when you pick a preset in the
 # UniFi UI. --restore copies them back from the (untouched) stored profile.
@@ -83,27 +103,43 @@ def connect():
     return c
 
 
-def check_shape(pid):
-    """Bail out unless every PID array is the length our fixed indices assume.
+def shape_problem(values):
+    """Why this PID array isn't the layout we write to, or None if it is.
 
-    We write by index, so a build of uhwd that adds, drops or reorders a field
+    Trailing fields beyond the seven we touch are fine and left alone: the
+    UNAS 2 (UniFi OS 5.x) publishes 11-entry arrays whose first seven are the
+    UNAS Pro's, with what look like max/min output and integral limits appended.
+    So the check is on the fields themselves rather than the array length -- a
+    build that reordered them would show up as a type or range mismatch here.
+    """
+    if not isinstance(values, list):
+        return f"is type {type(values).__name__}, not a list"
+    if len(values) < PID_LEN:
+        return f"has {len(values)} entries, fewer than the {PID_LEN} expected"
+    for index, (field, valid) in enumerate(PID_FIELDS):
+        if not valid(values[index]):
+            return f"has {values[index]!r} at index {index}, not a {field}"
+    return None
+
+
+def check_shape(pid):
+    """Bail out unless every PID array is the layout our fixed indices assume.
+
+    We write by index, so a build of uhwd that dropped or reordered a field
     would have us setting the wrong ones -- refuse rather than guess. (--restore
     copies whole arrays around and never indexes, so it skips this check and
     still works on such a box.)
     """
     for name, values in pid.items():
-        if isinstance(values, list) and len(values) == PID_LEN:
+        problem = shape_problem(values)
+        if problem is None:
             continue
-        found = (
-            f"{len(values)} entries" if isinstance(values, list)
-            else f"type {type(values).__name__}"
-        )
         sys.exit(
-            f"\nconfig.fan PID[{name!r}] has {found}, expected {PID_LEN} "
-            "([setpoint_C, Kp, Ki, Kd, bool, target_group, MIN_FLOOR]). This "
-            "build of uhwd lays its PID config out differently, so writing by "
-            "index would hit the wrong fields. Nothing written -- please open "
-            "a GitHub issue with the output above."
+            f"\nconfig.fan PID[{name!r}] {problem}; the first {PID_LEN} entries "
+            f"should be {PID_LAYOUT}. This build of uhwd lays its PID config "
+            "out differently, so writing by index would hit the wrong fields. "
+            "Nothing written -- please open a GitHub issue with the output "
+            "above."
         )
 
 
