@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## 2026-08-06: Accept the longer PID arrays published by newer UniFi OS builds.
+## v2.2 2026-08-21: Retune the expansion-chassis drive groups on the Enterprise NAS.
+
+### Fixed
+- Add support for the Enterprise NAS (ENAS) expansion chassis
+  ([#23](https://github.com/hoxxep/UNAS-Pro-fan-control/issues/23)).
+
+## v2.1 2026-08-06: Accept the longer PID arrays published by newer UniFi OS builds.
 
 ### Fixed
 - The UNAS 2 (UniFi OS 5.1, Drive 4.3) publishes 11-entry PID arrays rather than
@@ -17,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   °C, numeric gains, a bool, an integer target group, a 0-100 floor), which
   catches a genuinely reordered layout — something the length check never did.
 
-## 2026-07-29: Retune UniFi OS's own fan controller instead of driving the fans.
+## v2.0 2026-07-29: Retune UniFi OS's own fan controller instead of driving the fans.
 
 A rewrite of the approach. UniFi OS already runs a perfectly good PID fan
 controller in `uhwd`; the problem was only its setpoints (83°C CPU, 48°C HDD).
@@ -74,7 +80,7 @@ every start of the old script.
   drive temperatures in `fan_sensors.sh`. Now requires `python3` and the `ustd`
   Python package, both preinstalled on UniFi OS.
 
-## 2026-06-25: Overhaul to support all UNAS devices correctly.
+## v1.0 2026-06-25: Overhaul to support all UNAS devices correctly.
 
 ### Added
 - Distinct HDD and SSD fan curves. Drives are classified as HDD or SSD and the

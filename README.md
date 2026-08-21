@@ -140,7 +140,7 @@ If you skip the `--restore` step, reboot or switch the fan preset in the UniFi U
 
 ## Device support
 
-The current `uhwd`-based approach has been developed and tested on the **UNAS Pro**. It relies only on `uhwd`'s `config.fan`, which is common across UniFi OS, so it is expected to work across the UNAS and UNVR range. Note that the drive temps may take around 30-60 minutes to settle with the PID controller, including after boot.
+The current `uhwd`-based approach has been developed and tested on the **UNAS Pro**. It relies only on `uhwd`'s `config.fan`, which is common across UniFi OS, so it is expected to work on all UNAS, UNVR, ENAS, ENVR, and expansion bay products. Note that the drive temps may take around 60 minutes to settle at the target temperature, including after a reboot.
 
 <details>
 <summary><strong>Help confirm device support!</strong></summary>

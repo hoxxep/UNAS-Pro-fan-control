@@ -10,6 +10,11 @@ in the Status Database (config.fan) so uhwd itself keeps the box cooler:
   - HDD gains    -> Kp -2, Ki -0.02  (stock -1 / -0.01)
   - idle output  -> 15     (unchanged from stock)
 
+The HDD setpoint and gains go to every disk category, so on an Enterprise NAS
+the expansion-chassis groups (`esehdd1`, `esehdd2`, ...) are retuned alongside
+the main `hdd` one -- uhwd drives the expansion fans too, so there is nothing
+extra to run for them.
+
 Each per-category PID array starts with:
   [ setpoint_C, Kp, Ki, Kd, bool, target_group, MIN_FLOOR ]
 Some builds append further fields (the UNAS 2 publishes 11 entries); those are
@@ -143,21 +148,37 @@ def check_shape(pid):
         )
 
 
+def is_hdd_group(name):
+    """Is this PID category a group of spinning disks we should retune?
+
+    The Enterprise NAS with expansion chassis attached splits its drives across
+    several categories: `hdd` for the main chassis, then `esehdd1`, `esehdd2`,
+    ... for the expansion bays (slots 101-105 and 201-205 respectively), each
+    driving its own fans through uhwd. They are all HDDs, so they all want the
+    --hdd setpoint and the doubled gains; matched by numeric suffix rather than
+    a fixed list so a third expansion group works without a change here.
+    """
+    return name == "hdd" or (
+        name.startswith("esehdd") and name[len("esehdd"):].isdigit()
+    )
+
+
 def retune(fan, cpu, hdd, nvme, idle):
     """Set the setpoints, the HDD gains, and the idle fan output, in place."""
     pid = fan["PID"]
     check_shape(pid)
-    setpoints = {"cpu": cpu, "hdd": hdd, "nvme": nvme}
+    setpoints = {"cpu": cpu, "nvme": nvme}
     for name, values in pid.items():
-        if name in setpoints:
+        if is_hdd_group(name):
+            values[SETPOINT_IDX] = hdd
+            values[KP_IDX] = HDD_KP
+            values[KI_IDX] = HDD_KI
+        elif name in setpoints:
             values[SETPOINT_IDX] = setpoints[name]
         # Every category, not just the ones we set a setpoint for: they share
         # the fans, so one left at 100 (as the "cooling" preset sets them all)
         # pins the fans at full.
         values[FLOOR_IDX] = idle
-    if "hdd" in pid:
-        pid["hdd"][KP_IDX] = HDD_KP
-        pid["hdd"][KI_IDX] = HDD_KI
     fan["standby"] = idle
 
 
