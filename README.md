@@ -2,9 +2,9 @@
 
 Retune the fan controller on [Ubiquiti UNAS and UNVR products](https://ui.com/us/en/integrations/network-storage) to keep the HDDs cooler than the stock settings allow.
 
-UniFi OS already has a perfectly good fan controller: `uhwd` runs a PID loop over the CPU, HDD, and NVMe temperatures and computes a fan speed from them. The problem is only its setpoints: stock aims for **83°C CPU** and **48°C HDD**, which is hotter than most people want their drives to run.
+UniFi OS already has a perfectly good fan controller: a PID loop over the CPU, HDD, and NVMe temperatures that computes a fan speed from them. It runs in `uhwd` up to UniFi OS 5, and in its own `ufcd` daemon from UniFi OS 6. The problem is only its setpoints: stock aims for **83°C CPU** and **48°C HDD**, which is hotter than most people want their drives to run.
 
-So rather than fighting `uhwd` for control of the PWM channels, this project simply **reconfigures it**. `fan_control.py` rewrites the PID setpoints in the UniFi Status Database (`config.fan`) so `uhwd` itself keeps the box cooler:
+So rather than fighting it for control of the PWM channels, this project simply **reconfigures it**. `fan_control.py` rewrites the PID setpoints in the UniFi Status Database (`config.fan`) so UniFi OS itself keeps the box cooler:
 
 | Setting | Stock | This project |
 | --- | --- | --- |
@@ -21,11 +21,11 @@ Lowering the setpoints does most of the work: the PID ramps the fans up on its o
 > [!NOTE]
 > **Upgrading from the old `fan_control.sh`?** Just run the installer below. `fan_control.py` replaces the previous version of this project, which auto-detected sensors and drove the PWM channels directly with its own linear fan curve. That approach fought the UniFi PID controller for ~30 minutes after every start, oscillating the fan speed. It is kept in [`old/`](old/) for reference, but is no longer recommended.
 >
-> Both versions use the same `fan_control.service` unit name, so installing this one takes over cleanly: the installer stops the old service, hands the fans back to `uhwd`, deletes `/root/fan_control.sh`, and replaces the unit. There is nothing to remove by hand.
+> Both versions use the same `fan_control.service` unit name, so installing this one takes over cleanly: the installer stops the old service, hands the fans back to UniFi OS, deletes `/root/fan_control.sh`, and replaces the unit. There is nothing to remove by hand.
 
 ## Requirements
 
-- A UNAS, ENAS, UNVR, or ENVR running a UniFi OS build that does fan control in software via `uhwd` (Unifi OS 5.1.25 and beyond).
+- A UNAS, ENAS, UNVR, or ENVR running a UniFi OS build that does fan control in software via `uhwd` or `ufcd` (UniFi OS 5.1.25 and beyond, including UniFi OS 6).
 - Root SSH access to the device.
 - `python3` and the `ustd` Python package, both preinstalled on UniFi OS.
 
@@ -49,7 +49,17 @@ Setpoints -- press enter to accept the recommended value.
 
 The "current" column is read live out of `config.fan`, so on a re-run it shows what you last installed.
 
-The installer downloads `fan_control.py` to `/root`, checks your setpoints against it read-only before committing to them, and writes a `fan_control.service` systemd unit with them baked into its `ExecStart`. It also drops the read-only `fan_sensors.sh` diagnostic next to it. The unit is a one-shot: it applies the setpoints, restarts `uhwd` to pick them up, and exits (staying "active" so `systemctl status` shows whether it ran this boot). It is ordered after `uhwd.service` and retries if `config.fan` isn't published yet.
+The installer downloads `fan_control.py` to `/root`, checks your setpoints against it read-only before committing to them, and writes a `fan_control.service` systemd unit with them baked into its `ExecStart`. It also drops the read-only `fan_sensors.sh` diagnostic next to it. The unit is a one-shot: it applies the setpoints, restarts the fan daemon to pick them up (`ufcd` on UniFi OS 6, `uhwd` before it), and exits (staying "active" so `systemctl status` shows whether it ran this boot). It is ordered after `uhwd.service` and `ufcd.service`, and retries if `config.fan` isn't published yet.
+
+### Install from a checkout
+
+`install.sh` always fetches the published files from GitHub. To install your own modified copy instead, run `deploy.sh` from a checkout of this repo on your own machine, giving it the device to SSH into:
+
+```bash
+./deploy.sh root@unas
+```
+
+It copies `install.sh`, `fan_control.py`, and `fan_sensors.sh` to a temporary directory on the device, runs that `install.sh` against them (prompting for the setpoints as usual), and then removes the copies. Any options after the host go to `install.sh`, e.g. `./deploy.sh root@unas --hdd 38`.
 
 <details>
 <summary><strong>Manual install, without the installer</strong></summary>
@@ -108,7 +118,7 @@ Wait at least 60 minutes after install before judging the temperatures and fan s
 ## Caveats
 
 - **`config.fan` is volatile.** `uhwd` re-initialises it to stock defaults on a full reboot, which is exactly why the systemd unit exists. A plain `systemctl restart uhwd` keeps the retuned values.
-- **Changing the fan preset in the UniFi UI reverts these values**, because `uhwd` re-derives the live config from the newly selected profile. Re-run `systemctl restart fan_control.service` afterwards, or reboot.
+- **Changing the fan preset in the UniFi UI reverts these values**, because the fan daemon re-derives the live config from the newly selected profile. Re-run `systemctl restart fan_control.service` afterwards, or reboot.
 - **The UniFi UI will still show whichever preset is selected.** There is no indication in the UI that the setpoints have been changed underneath it.
 
 ## Uninstall
@@ -117,7 +127,7 @@ Wait at least 60 minutes after install before judging the temperatures and fan s
 curl -fsSL https://raw.githubusercontent.com/hoxxep/UNAS-Pro-fan-control/refs/heads/main/uninstall.sh | bash
 ```
 
-This disables the service, restores the stock setpoints, removes the installed files, and restarts `uhwd` with **no reboot needed**. The stock values are read back out of the factory profile stored in `config.fan`, so whichever preset you have selected in the UniFi UI is exactly what you get back.
+This disables the service, restores the stock setpoints, removes the installed files, and restarts the fan daemon with **no reboot needed**. The stock values are read back out of the factory profile stored in `config.fan`, so whichever preset you have selected in the UniFi UI is exactly what you get back.
 
 <details>
 <summary><strong>Manual uninstall, without the script</strong></summary>
@@ -140,7 +150,7 @@ If you skip the `--restore` step, reboot or switch the fan preset in the UniFi U
 
 ## Device support
 
-The current `uhwd`-based approach has been developed and tested on the **UNAS Pro**. It relies only on `uhwd`'s `config.fan`, which is common across UniFi OS, so it is expected to work on all UNAS, UNVR, ENAS, ENVR, and expansion bay products. Note that the drive temps may take around 60 minutes to settle at the target temperature, including after a reboot.
+The current `config.fan`-based approach has been developed and tested on the **UNAS Pro**. It relies only on `config.fan`, which is common across UniFi OS, so it is expected to work on all UNAS, UNVR, ENAS, ENVR, and expansion bay products. Note that the drive temps may take around 60 minutes to settle at the target temperature, including after a reboot.
 
 <details>
 <summary><strong>Help confirm device support!</strong></summary>
@@ -155,7 +165,7 @@ Reports for issues with this fan control service are very welcome.
 
 ## How it works
 
-`uhwd` publishes its live fan config to the Status Database under `config.fan`. Reading it on a stock UNAS Pro gives:
+`uhwd` publishes its live fan config to the Status Database under `config.fan`, and the fan daemon (`uhwd` itself up to UniFi OS 5, `ufcd` from UniFi OS 6) runs its PID loop from it. `ufcd` picks up a new UI preset on its own, but not an edit to the PID setpoints, which is why `fan_control.py` restarts it after writing. Reading `config.fan` on a stock UNAS Pro gives:
 
 ```json
 {

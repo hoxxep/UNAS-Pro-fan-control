@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## v2.3 2026-10-10: Support the new `ufcd` fan daemon in UniFi OS 6.
+
+### Fixed
+- UniFi OS 6 moved the fan PID loop out of `uhwd` into a new `ufcd` daemon,
+  which picks up a new UI preset on its own but not an edit to the PID
+  setpoints in `config.fan`. Since only `uhwd` was restarted after writing, the
+  retuned setpoints sat unused in `config.fan` while the fans ran at stock
+  ([#25](https://github.com/hoxxep/UNAS-Pro-fan-control/discussions/25)).
+  `fan_control.py` now restarts `ufcd` when the box has it, and `uhwd` as
+  before when it doesn't, and the unit is ordered after `ufcd.service` too, so
+  the same install works on UniFi OS 5 and 6.
+- A failed restart of the fan daemon is now an error rather than being ignored,
+  since it leaves the fans at their old setpoints while looking like success.
+
+### Added
+- `deploy.sh [user@]host [options]`: install from a local checkout over SSH,
+  for trying out modified copies. It stages the checkout's `install.sh`,
+  `fan_control.py`, and `fan_sensors.sh` on the device and runs the same
+  install against them, rather than fetching the published files from GitHub.
+
 ## v2.2 2026-08-21: Retune the expansion-chassis drive groups on the Enterprise NAS.
 
 ### Fixed
