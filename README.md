@@ -2,6 +2,9 @@
 
 Retune the fan controller on [Ubiquiti UNAS and UNVR products](https://ui.com/us/en/integrations/network-storage) to keep the HDDs cooler than the stock settings allow.
 
+> [!NOTE]
+> Now supports UnifiOS 6 and UnifiOS 5. Please rerun the installer to upgrade for UnifiOS 6 support. We recommend subscribing to release notifications on Github.
+
 UniFi OS already has a perfectly good fan controller: a PID loop over the CPU, HDD, and NVMe temperatures that computes a fan speed from them. It runs in `uhwd` up to UniFi OS 5, and in its own `ufcd` daemon from UniFi OS 6. The problem is only its setpoints: stock aims for **83°C CPU** and **48°C HDD**, which is hotter than most people want their drives to run.
 
 So rather than fighting it for control of the PWM channels, this project simply **reconfigures it**. `fan_control.py` rewrites the PID setpoints in the UniFi Status Database (`config.fan`) so UniFi OS itself keeps the box cooler:
