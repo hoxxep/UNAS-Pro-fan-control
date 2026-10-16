@@ -5,7 +5,7 @@
 # READ-ONLY: dumps every hwmon chip, thermal zone, and fan/PWM channel together
 # with its kernel name and label, plus each SMART drive's temperature. It does
 # NOT change any fan speed. Use it to check the effect of the setpoints
-# fan_control.py hands to uhwd, and to see exactly what each temperature sensor,
+# fan_control.py hands to UniFi OS, and to see exactly what each temperature sensor,
 # drive, and fan is across the device range (UNAS 2 ... EUNAS/ENVR).
 #
 # Run on the device:        /root/fan_sensors.sh
@@ -60,9 +60,10 @@ for h in /sys/class/hwmon/hwmon*; do
     done
 
     # PWM outputs and their control mode (skip pwmN_enable/_mode siblings).
-    # Mode 1 (manual) is the normal state here: UniFi OS's own fan daemon, uhwd,
-    # drives the PWM in software from its PID loop. Nothing in this repo writes
-    # pwm* directly; fan_control.py only retunes uhwd's setpoints.
+    # Mode 1 (manual) is the normal state here: UniFi OS's own fan daemon (uhwd,
+    # or ufcd from UniFi OS 6) drives the PWM in software from its PID loop.
+    # Nothing in this repo writes pwm* directly; fan_control.py only retunes the
+    # daemon's setpoints.
     for p in "$h"/pwm*; do
         [[ -e "$p" ]] || continue
         bn="$(basename "$p")"
@@ -70,7 +71,7 @@ for h in /sys/class/hwmon/hwmon*; do
         en="$(read_raw "${p}_enable")"
         case "$en" in
             0)  mode="no SW control / full speed" ;;
-            1)  mode="manual (UniFi OS uhwd daemon)" ;;
+            1)  mode="manual (UniFi OS uhwd/ufcd daemon)" ;;
             \?) mode="" ;;
             *)  mode="automatic / chip curve" ;;
         esac
@@ -81,7 +82,7 @@ done
 echo
 echo "------------------------------------------------------------------"
 echo "pwm enable legend:  0 = no software control (firmware/full speed)"
-echo "                    1 = manual (expected: uhwd drives the fans in software)"
+echo "                    1 = manual (expected: uhwd/ufcd drive the fans in software)"
 echo "                    2+ = automatic / chip thermal curve (rejected on the"
 echo "                         UniFi OS builds that do fan control in software)"
 echo "------------------------------------------------------------------"
@@ -108,7 +109,7 @@ fi
 echo
 echo "=================================================================="
 echo " drives             smartctl --scan-open"
-echo "   (HDD/SSD temps via SMART: what uhwd's hdd/nvme PID loops track)"
+echo "   (HDD/SSD temps via SMART: what the hdd/nvme PID loops track)"
 echo "=================================================================="
 if ! command -v smartctl >/dev/null 2>&1; then
     echo "   smartctl not found (install smartmontools) - skipping drives."
@@ -130,8 +131,8 @@ else
             continue
         fi
 
-        # Current temperature, HDD/SSD class (roughly uhwd's hdd vs nvme PID
-        # categories), and the model/rotation so an unknown drive can be
+        # Current temperature, HDD/SSD class (roughly the fan daemon's hdd vs
+        # nvme PID categories), and the model/rotation so an unknown drive can be
         # identified from the output. Temperature is "?" rather than dropped, so
         # a drive that reports none is still visible as a drive that's present.
         line="$(jq -r '

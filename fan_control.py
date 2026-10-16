@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Read (and optionally retune) UniFi OS's own fan controller (uhwd) on a UNAS Pro.
+"""Read (and optionally retune) UniFi OS's own fan controller on a UNAS Pro.
 
-Instead of fighting uhwd by writing pwm* directly, this edits its PID setpoints
-in the Status Database (config.fan) so uhwd itself keeps the box cooler:
+Instead of fighting it by writing pwm* directly, this edits its PID setpoints in
+the Status Database (config.fan) so the fan daemon itself keeps the box cooler.
+That daemon is uhwd up to UniFi OS 5; UniFi OS 6 moved the PID loop out into
+its own ufcd, which still reads config.fan. The retuned values are:
 
   - CPU setpoint -> 70 C   (stock default 83)
   - HDD setpoint -> 40 C   (stock default 48)
@@ -12,8 +14,8 @@ in the Status Database (config.fan) so uhwd itself keeps the box cooler:
 
 The HDD setpoint and gains go to every disk category, so on an Enterprise NAS
 the expansion-chassis groups (`esehdd1`, `esehdd2`, ...) are retuned alongside
-the main `hdd` one -- uhwd drives the expansion fans too, so there is nothing
-extra to run for them.
+the main `hdd` one -- the fan daemon drives the expansion fans too, so there is
+nothing extra to run for them.
 
 Each per-category PID array starts with:
   [ setpoint_C, Kp, Ki, Kd, bool, target_group, MIN_FLOOR ]
@@ -36,13 +38,14 @@ do when there's no heat to shift", and stock sets them to the same value, so
 Run on the UNAS as root:
 
   python3 fan_control.py                      # read-only: current vs proposed
-  python3 fan_control.py --write              # apply the change and restart uhwd
+  python3 fan_control.py --write              # apply the change and restart the fan daemon
   python3 fan_control.py --hdd 40 --write     # apply custom setpoints
   python3 fan_control.py --restore --write    # put the factory values back
 
 NOTE: config.fan is volatile -- uhwd re-initialises it to stock defaults on a
 full reboot (a plain `systemctl restart uhwd` keeps these values). To make it
-persist, re-run this at boot from a systemd unit ordered After=uhwd.service.
+persist, re-run this at boot from a systemd unit ordered after uhwd.service
+and ufcd.service.
 See install.sh, which sets that up for you.
 """
 
@@ -101,6 +104,46 @@ PID_LAYOUT = "[" + ", ".join(name for name, _ in PID_FIELDS) + "]"
 PROFILE_KEYS = ("PID", "targets", "standby", "calc_type")
 
 
+def unit_exists(name):
+    """Is there a systemd unit of this name installed on this box?"""
+    result = subprocess.run(
+        ["systemctl", "show", "--property=LoadState", "--value", f"{name}.service"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout.strip() == "loaded"
+
+
+def fan_daemon():
+    """The daemon running the PID loop, which must restart to pick up config.fan.
+
+    UniFi OS 6 split fan control out of uhwd into a new ufcd. ufcd reloads when
+    the UI preset changes, but not when config.fan.PID is edited, and restarting
+    uhwd does not touch it either -- so on those builds it is ufcd that needs the
+    restart. Older builds have no ufcd and run the loop in uhwd itself.
+    """
+    return "ufcd" if unit_exists("ufcd") else "uhwd"
+
+
+def restart_fan_daemon():
+    """Restart the fan daemon so it re-reads config.fan, or exit if that fails.
+
+    A failed restart leaves the new values sitting in config.fan while the fans
+    carry on at the old ones, which looks exactly like success from the outside,
+    so it is an error rather than something to shrug off.
+    """
+    daemon = fan_daemon()
+    print(f"\nconfig.fan updated. Restarting {daemon} to apply...")
+    result = subprocess.run(["systemctl", "restart", daemon], check=False)
+    if result.returncode != 0:
+        sys.exit(
+            f"`systemctl restart {daemon}` failed (exit {result.returncode}). "
+            "config.fan holds the new values, but the fan controller has not "
+            "picked them up."
+        )
+
+
 def connect():
     c = SDBClient()
     threading.Thread(target=c.run, daemon=True).start()
@@ -154,9 +197,10 @@ def is_hdd_group(name):
     The Enterprise NAS with expansion chassis attached splits its drives across
     several categories: `hdd` for the main chassis, then `esehdd1`, `esehdd2`,
     ... for the expansion bays (slots 101-105 and 201-205 respectively), each
-    driving its own fans through uhwd. They are all HDDs, so they all want the
-    --hdd setpoint and the doubled gains; matched by numeric suffix rather than
-    a fixed list so a third expansion group works without a change here.
+    driving its own fans through the fan daemon. They are all HDDs, so they all
+    want the --hdd setpoint and the doubled gains; matched by numeric suffix
+    rather than a fixed list so a third expansion group works without a change
+    here.
     """
     return name == "hdd" or (
         name.startswith("esehdd") and name[len("esehdd"):].isdigit()
@@ -250,12 +294,13 @@ def temperature(low, high):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Show uhwd's live fan PID config; pass --write to retune it."
+        description="Show the live fan PID config; pass --write to retune it."
     )
     parser.add_argument(
         "--write",
         action="store_true",
-        help="write to config.fan and restart uhwd (default is read-only)",
+        help="write to config.fan and restart the fan daemon, ufcd or uhwd "
+             "(default is read-only)",
     )
     parser.add_argument(
         "--cpu",
@@ -350,8 +395,7 @@ def main():
         return
 
     c.update("config.fan", fan)
-    print("\nconfig.fan updated. Restarting uhwd to apply...")
-    subprocess.run(["systemctl", "restart", "uhwd"], check=False)
+    restart_fan_daemon()
     print("Done. Watch temps/fan RPM with: bash fan_sensors.sh")
 
 

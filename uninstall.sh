@@ -57,9 +57,9 @@ systemctl daemon-reload
 echo
 if [ "$restored" = true ]; then
     cat <<EOF
-Uninstalled. The stock fan setpoints are back and uhwd has been restarted, so
-no reboot is needed. The fan preset shown in the UniFi UI is unchanged and is
-once again the only thing driving the fans.
+Uninstalled. The stock fan setpoints are back and the fan daemon has been
+restarted, so no reboot is needed. The fan preset shown in the UniFi UI is
+unchanged and is once again the only thing driving the fans.
 EOF
 else
     cat <<EOF
@@ -69,7 +69,7 @@ get them back, either:
   - reboot the device, or
   - switch the fan profile in the UniFi OS UI.
 
-Nothing is in a bad state meanwhile: uhwd is still the only thing driving the
-fans, just with this project's setpoints until you do one of the above.
+Nothing is in a bad state meanwhile: UniFi OS is still the only thing driving
+the fans, just with this project's setpoints until you do one of the above.
 EOF
 fi
